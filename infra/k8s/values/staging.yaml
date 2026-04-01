@@ -64,8 +64,8 @@ backend:
   replicas: 1
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 50m
+      memory: 192Mi
     limits:
       cpu: 500m
       memory: 768Mi
@@ -76,8 +76,8 @@ aiService:
   replicas: 1
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 50m
+      memory: 192Mi
     limits:
       cpu: 500m
       memory: 768Mi
@@ -88,28 +88,28 @@ celeryWorker:
   replicas: 1
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 30m
+      memory: 192Mi
     limits:
       cpu: 500m
       memory: 768Mi
 
 aiCeleryWorker:
-  replicas: 1
+  replicas: 0
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 25m
+      memory: 128Mi
     limits:
       cpu: 500m
       memory: 768Mi
 
 celeryBeat:
-  replicas: 1
+  replicas: 0
   resources:
     requests:
-      cpu: 50m
-      memory: 128Mi
+      cpu: 15m
+      memory: 96Mi
     limits:
       cpu: 250m
       memory: 256Mi
@@ -118,7 +118,7 @@ frontend:
   replicas: 1
   resources:
     requests:
-      cpu: 50m
+      cpu: 25m
       memory: 96Mi
     limits:
       cpu: 250m
@@ -128,7 +128,7 @@ gateway:
   replicas: 1
   resources:
     requests:
-      cpu: 100m
+      cpu: 50m
       memory: 128Mi
     limits:
       cpu: 500m
@@ -139,8 +139,8 @@ gateway:
 postgresCore:
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 50m
+      memory: 192Mi
     limits:
       cpu: 500m
       memory: 768Mi
@@ -148,8 +148,8 @@ postgresCore:
 postgresAi:
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 50m
+      memory: 192Mi
     limits:
       cpu: 500m
       memory: 768Mi
@@ -157,8 +157,8 @@ postgresAi:
 redis:
   resources:
     requests:
-      cpu: 50m
-      memory: 128Mi
+      cpu: 25m
+      memory: 96Mi
     limits:
       cpu: 250m
       memory: 256Mi
@@ -166,8 +166,8 @@ redis:
 rabbitmq:
   resources:
     requests:
-      cpu: 50m
-      memory: 128Mi
+      cpu: 25m
+      memory: 96Mi
     limits:
       cpu: 300m
       memory: 384Mi
@@ -175,8 +175,8 @@ rabbitmq:
 mongo:
   resources:
     requests:
-      cpu: 50m
-      memory: 128Mi
+      cpu: 25m
+      memory: 96Mi
     limits:
       cpu: 300m
       memory: 384Mi
@@ -184,8 +184,8 @@ mongo:
 qdrant:
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 50m
+      memory: 192Mi
     limits:
       cpu: 500m
       memory: 512Mi
