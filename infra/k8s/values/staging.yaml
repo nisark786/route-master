@@ -95,20 +95,20 @@ celeryWorker:
       memory: 768Mi
 
 aiCeleryWorker:
-  replicas: 0
+  replicas: 1
   resources:
     requests:
-      cpu: 25m
+      cpu: 10m
       memory: 128Mi
     limits:
       cpu: 500m
       memory: 768Mi
 
 celeryBeat:
-  replicas: 0
+  replicas: 1
   resources:
     requests:
-      cpu: 15m
+      cpu: 10m
       memory: 96Mi
     limits:
       cpu: 250m
