@@ -64,7 +64,9 @@ jobs:
           docker push $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-frontend:${GITHUB_SHA}
 
   deploy:
-    runs-on: ubuntu-latest
+    # Local Docker Desktop Kubernetes is only reachable from a self-hosted runner
+    # running on the same machine/network.
+    runs-on: self-hosted
     needs: build-images
     environment: staging
     steps:
