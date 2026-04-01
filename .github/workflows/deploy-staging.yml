@@ -108,7 +108,6 @@ jobs:
           $privatePath = "C:\actions-runner\_work\_temp\staging.private.yaml"
           helm upgrade --install $env:RELEASE_NAME infra/k8s/helm/route-management `
             -n $env:NAMESPACE `
-            --create-namespace `
             -f infra/k8s/helm/route-management/values.yaml `
             -f infra/k8s/values/staging.yaml `
             -f $privatePath `
