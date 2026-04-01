@@ -79,13 +79,13 @@ jobs:
           version: v1.30.2
 
       - name: Setup Helm (Windows self-hosted)
-        shell: pwsh
+        shell: powershell
         run: |
           choco install kubernetes-helm --version=3.15.4 -y
           helm version
 
       - name: Configure kubeconfig
-        shell: pwsh
+        shell: powershell
         run: |
           $kubeDir = Join-Path $env:USERPROFILE ".kube"
           New-Item -ItemType Directory -Force -Path $kubeDir | Out-Null
@@ -94,7 +94,7 @@ jobs:
           Write-Host "Kubeconfig written to $kubeConfigPath"
 
       - name: Write staging private values
-        shell: pwsh
+        shell: powershell
         run: |
           $privatePath = "C:\actions-runner\_work\_temp\staging.private.yaml"
           @"
@@ -103,7 +103,7 @@ jobs:
           Write-Host "Private values written to $privatePath"
 
       - name: Deploy with Helm
-        shell: pwsh
+        shell: powershell
         run: |
           $privatePath = "C:\actions-runner\_work\_temp\staging.private.yaml"
           helm upgrade --install $env:RELEASE_NAME infra/k8s/helm/route-management `
@@ -121,7 +121,7 @@ jobs:
             --wait --timeout 15m
 
       - name: Post-deploy smoke check
-        shell: pwsh
+        shell: powershell
         run: |
           kubectl run smoke-staging-check -n $env:NAMESPACE --rm -i --restart=Never `
             --image=curlimages/curl --command -- sh -lc "set -e; curl -sS -o /dev/null -w 'gateway=%{http_code}\n' http://$env:RELEASE_NAME-gateway/healthz; curl -sS -o /dev/null -w 'core=%{http_code}\n' http://$env:RELEASE_NAME-gateway/api/core/health/; curl -sS -o /dev/null -w 'ai=%{http_code}\n' http://$env:RELEASE_NAME-gateway/api/ai/health"
