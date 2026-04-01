@@ -1,0 +1,14 @@
+aws_region            = "ap-south-1"
+bucket_name           = "nisar-route-master-123"
+lambda_function_name  = "route-management-image-optimizer"
+lambda_role_name      = "route-management-image-optimizer-role"
+lambda_package_path   = "../lambda/image_optimizer/build/image-optimizer.zip"
+
+# Keep false first if your bucket already has notifications managed elsewhere.
+manage_bucket_notifications = false
+
+# Optional CloudFront media CDN.
+enable_cloudfront              = false
+manage_cloudfront_bucket_policy = false
+cloudfront_price_class         = "PriceClass_200"
+cloudfront_comment             = "RouteMaster media CDN"

@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "route-management.fullname" . }}-postgres-core
+  namespace: {{ include "route-management.namespace" . }}
+  labels:
+    {{- include "route-management.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres-core
+spec:
+  serviceName: {{ include "route-management.fullname" . }}-postgres-core
+  replicas: {{ .Values.postgresCore.replicas }}
+  selector:
+    matchLabels:
+      {{- include "route-management.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: postgres-core
+  template:
+    metadata:
+      labels:
+        {{- include "route-management.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: postgres-core
+    spec:
+      containers:
+        - name: postgres-core
+          image: "{{ .Values.images.postgresCore.repository }}:{{ .Values.images.postgresCore.tag }}"
+          imagePullPolicy: {{ .Values.images.postgresCore.pullPolicy }}
+          env:
+            - name: POSTGRES_DB
+              value: {{ .Values.config.core.DB_NAME | quote }}
+            - name: POSTGRES_USER
+              value: {{ .Values.config.core.DB_USER | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "route-management.fullname" . }}-app-secrets
+                  key: DB_PASSWORD
+          ports:
+            - containerPort: {{ .Values.postgresCore.service.port }}
+              name: postgres
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            {{- toYaml .Values.postgresCore.resources | nindent 12 }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.global.storageClass }}
+        storageClassName: {{ .Values.global.storageClass }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.postgresCore.persistence.size }}
+---

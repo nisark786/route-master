@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "route-management.fullname" . }}-mongo
+  namespace: {{ include "route-management.namespace" . }}
+  labels:
+    {{- include "route-management.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "route-management.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: mongo
+  ports:
+    - name: mongo
+      port: {{ .Values.mongo.service.port }}
+      targetPort: mongo
+---

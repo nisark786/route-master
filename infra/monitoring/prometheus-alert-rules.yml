@@ -1,0 +1,103 @@
+groups:
+  - name: route-management-slo-alerts
+    interval: 30s
+    rules:
+      - alert: CoreServiceDown
+        expr: up{job="core_service"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: core_service
+        annotations:
+          summary: "Core service is down"
+          description: "Prometheus cannot scrape core_service for 2 minutes."
+
+      - alert: AIServiceDown
+        expr: up{job="ai_service"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: ai_service
+        annotations:
+          summary: "AI service is down"
+          description: "Prometheus cannot scrape ai_service for 2 minutes."
+
+      - alert: CoreServiceHighLatencyP95
+        expr: histogram_quantile(0.95, sum(rate(django_http_requests_latency_including_middlewares_seconds_bucket[5m])) by (le)) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          service: core_service
+        annotations:
+          summary: "Core service p95 latency is high"
+          description: "Core p95 request latency is above 500ms for 10 minutes."
+
+      - alert: AIServiceHighLatencyP95
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job="ai_service"}[5m])) by (le)) > 1
+        for: 10m
+        labels:
+          severity: warning
+          service: ai_service
+        annotations:
+          summary: "AI service p95 latency is high"
+          description: "AI p95 request latency is above 1 second for 10 minutes."
+
+      - alert: CoreServiceHigh5xxRate
+        expr: (sum(rate(django_http_responses_total_by_status_total{status=~"5.."}[5m])) / clamp_min(sum(rate(django_http_responses_total_by_status_total[5m])), 1e-6)) > 0.05
+        for: 10m
+        labels:
+          severity: critical
+          service: core_service
+        annotations:
+          summary: "Core service 5xx ratio is high"
+          description: "Core service 5xx ratio is above 5% for 10 minutes."
+
+      - alert: AIServiceHigh5xxRate
+        expr: (sum(rate(http_requests_total{job="ai_service",status=~"5.."}[5m])) / clamp_min(sum(rate(http_requests_total{job="ai_service"}[5m])), 1e-6)) > 0.05
+        for: 10m
+        labels:
+          severity: critical
+          service: ai_service
+        annotations:
+          summary: "AI service 5xx ratio is high"
+          description: "AI service 5xx ratio is above 5% for 10 minutes."
+
+      - alert: RabbitMQBacklogHigh
+        expr: sum(rabbitmq_queue_messages) > 1000
+        for: 10m
+        labels:
+          severity: warning
+          service: rabbitmq
+        annotations:
+          summary: "RabbitMQ backlog is high"
+          description: "RabbitMQ total queued messages is above 1000 for 10 minutes."
+
+      - alert: MongoDBExporterDown
+        expr: up{job="mongodb_exporter"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          service: mongodb_exporter
+        annotations:
+          summary: "MongoDB exporter is down"
+          description: "Prometheus cannot scrape mongodb_exporter for 5 minutes."
+
+      - alert: PostgresCoreExporterDown
+        expr: up{job="postgres_core_exporter"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          service: postgres_core_exporter
+        annotations:
+          summary: "Postgres core exporter is down"
+          description: "Prometheus cannot scrape postgres_core_exporter for 5 minutes."
+
+      - alert: PostgresAIExporterDown
+        expr: up{job="postgres_ai_exporter"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          service: postgres_ai_exporter
+        annotations:
+          summary: "Postgres AI exporter is down"
+          description: "Prometheus cannot scrape postgres_ai_exporter for 5 minutes."

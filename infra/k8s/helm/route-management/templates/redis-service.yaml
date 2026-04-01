@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "route-management.fullname" . }}-redis
+  namespace: {{ include "route-management.namespace" . }}
+  labels:
+    {{- include "route-management.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "route-management.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+  ports:
+    - name: redis
+      port: {{ .Values.redis.service.port }}
+      targetPort: redis
+---

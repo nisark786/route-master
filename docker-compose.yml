@@ -1,0 +1,404 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: route_db
+    env_file:
+      - ./core_services/.env
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d route_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: route_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: route_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: "route_user"
+      RABBITMQ_DEFAULT_PASS: "route_pass"
+      RABBITMQ_DEFAULT_VHOST: "route_vhost"
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 15s
+      retries: 20
+      start_period: 60s
+
+  mongo:
+    image: mongo:7
+    container_name: route_mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  backend:
+    build:
+      context: ./core_services
+      dockerfile: Dockerfile
+    container_name: route_backend
+    working_dir: /app
+    volumes:
+      - ./core_services:/app
+    command: sh -c "daphne -b 0.0.0.0 -p 8000 config.asgi:application"
+    env_file:
+      - ./core_services/.env
+    environment:
+      DB_ENGINE: "django.contrib.gis.db.backends.postgis"
+      DB_HOST: "db"
+      DB_PORT: "5432"
+      ALLOWED_HOSTS: "localhost,127.0.0.1,testserver,192.168.220.81,192.168.220.144,172.20.96.1,172.25.224.1,backend,route_backend,gateway,route_gateway"
+      CORS_ALLOWED_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173"
+      REDIS_URL: "redis://redis:6379/1"
+      USE_REDIS_CACHE: "False"
+      USE_S3_MEDIA: "${USE_S3_MEDIA:-False}"
+      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID:-}"
+      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY:-}"
+      AWS_SESSION_TOKEN: "${AWS_SESSION_TOKEN:-}"
+      AWS_STORAGE_BUCKET_NAME: "${AWS_STORAGE_BUCKET_NAME:-}"
+      AWS_S3_REGION_NAME: "${AWS_S3_REGION_NAME:-}"
+      AWS_S3_CUSTOM_DOMAIN: "${AWS_S3_CUSTOM_DOMAIN:-}"
+      AWS_S3_MEDIA_PREFIX: "${AWS_S3_MEDIA_PREFIX:-media}"
+      AWS_QUERYSTRING_AUTH: "${AWS_QUERYSTRING_AUTH:-False}"
+      CELERY_BROKER_URL: "amqp://route_user:route_pass@rabbitmq:5672/route_vhost"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/1"
+      SEND_OTP_ASYNC: "True"
+      MONGO_URI: "mongodb://mongo:27017"
+      MONGO_DB_NAME: "route_tracking"
+      MONGO_LOCATIONS_COLLECTION: "driver_locations"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+      mongo:
+        condition: service_started
+    ports:
+      - "8000:8000"
+
+  celery_worker:
+    build:
+      context: ./core_services
+      dockerfile: Dockerfile
+    container_name: route_celery_worker
+    working_dir: /app
+    volumes:
+      - ./core_services:/app
+    command: sh -c "celery -A config worker -l info"
+    env_file:
+      - ./core_services/.env
+    environment:
+      DB_ENGINE: "django.contrib.gis.db.backends.postgis"
+      DB_HOST: "db"
+      DB_PORT: "5432"
+      ALLOWED_HOSTS: "localhost,127.0.0.1,testserver,192.168.220.81,192.168.220.144,172.20.96.1,172.25.224.1,backend,route_backend,gateway,route_gateway"
+      CORS_ALLOWED_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173"
+      REDIS_URL: "redis://redis:6379/1"
+      USE_REDIS_CACHE: "False"
+      USE_S3_MEDIA: "${USE_S3_MEDIA:-False}"
+      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID:-}"
+      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY:-}"
+      AWS_SESSION_TOKEN: "${AWS_SESSION_TOKEN:-}"
+      AWS_STORAGE_BUCKET_NAME: "${AWS_STORAGE_BUCKET_NAME:-}"
+      AWS_S3_REGION_NAME: "${AWS_S3_REGION_NAME:-}"
+      AWS_S3_CUSTOM_DOMAIN: "${AWS_S3_CUSTOM_DOMAIN:-}"
+      AWS_S3_MEDIA_PREFIX: "${AWS_S3_MEDIA_PREFIX:-media}"
+      AWS_QUERYSTRING_AUTH: "${AWS_QUERYSTRING_AUTH:-False}"
+      CELERY_BROKER_URL: "amqp://route_user:route_pass@rabbitmq:5672/route_vhost"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/1"
+      SEND_OTP_ASYNC: "True"
+      MONGO_URI: "mongodb://mongo:27017"
+      MONGO_DB_NAME: "route_tracking"
+      MONGO_LOCATIONS_COLLECTION: "driver_locations"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+      mongo:
+        condition: service_started
+
+  celery_beat:
+    build:
+      context: ./core_services
+      dockerfile: Dockerfile
+    container_name: route_celery_beat
+    working_dir: /app
+    volumes:
+      - ./core_services:/app
+    command: sh -c "celery -A config beat -l info"
+    env_file:
+      - ./core_services/.env
+    environment:
+      DB_ENGINE: "django.contrib.gis.db.backends.postgis"
+      DB_HOST: "db"
+      DB_PORT: "5432"
+      ALLOWED_HOSTS: "localhost,127.0.0.1,testserver,192.168.220.81,192.168.220.144,172.20.96.1,172.25.224.1,backend,route_backend,gateway,route_gateway"
+      CORS_ALLOWED_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173"
+      REDIS_URL: "redis://redis:6379/1"
+      USE_REDIS_CACHE: "False"
+      USE_S3_MEDIA: "${USE_S3_MEDIA:-False}"
+      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID:-}"
+      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY:-}"
+      AWS_SESSION_TOKEN: "${AWS_SESSION_TOKEN:-}"
+      AWS_STORAGE_BUCKET_NAME: "${AWS_STORAGE_BUCKET_NAME:-}"
+      AWS_S3_REGION_NAME: "${AWS_S3_REGION_NAME:-}"
+      AWS_S3_CUSTOM_DOMAIN: "${AWS_S3_CUSTOM_DOMAIN:-}"
+      AWS_S3_MEDIA_PREFIX: "${AWS_S3_MEDIA_PREFIX:-media}"
+      AWS_QUERYSTRING_AUTH: "${AWS_QUERYSTRING_AUTH:-False}"
+      CELERY_BROKER_URL: "amqp://route_user:route_pass@rabbitmq:5672/route_vhost"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/1"
+      SEND_OTP_ASYNC: "True"
+      AI_AUTOSYNC_ENABLED: "True"
+      AI_AUTOSYNC_INTERVAL_MINUTES: "15"
+      MONGO_URI: "mongodb://mongo:27017"
+      MONGO_DB_NAME: "route_tracking"
+      MONGO_LOCATIONS_COLLECTION: "driver_locations"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+      mongo:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend/route_management
+      dockerfile: Dockerfile
+    container_name: route_frontend
+    working_dir: /app
+    volumes:
+      - ./frontend/route_management:/app
+      - /app/node_modules
+    command: sh -c "npm run dev -- --host 0.0.0.0 --port 5173"
+    env_file:
+      - ./frontend/route_management/.env
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+      VITE_API_PROXY_TARGET: "http://gateway:80"
+    depends_on:
+      - gateway
+    ports:
+      - "5173:5173"
+
+  gateway:
+    image: nginx:1.27-alpine
+    container_name: route_gateway
+    volumes:
+      - ./infra/nginx/gateway.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+      - ai_service
+    ports:
+      - "8080:80"
+
+  ai_service:
+    build:
+      context: ./ai_service
+      dockerfile: Dockerfile
+    container_name: route_ai_service
+    working_dir: /app
+    volumes:
+      - ./ai_service:/app
+    command: sh -c "uvicorn app.main:app --host 0.0.0.0 --port 8001"
+    env_file:
+      - ./ai_service/.env
+    environment:
+      CELERY_BROKER_URL: "amqp://route_user:route_pass@rabbitmq:5672/route_vhost"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/2"
+    depends_on:
+      ai_db:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - ai_net
+      - default
+    ports:
+      - "8001:8001"
+
+  ai_celery_worker:
+    build:
+      context: ./ai_service
+      dockerfile: Dockerfile
+    container_name: route_ai_celery_worker
+    working_dir: /app
+    volumes:
+      - ./ai_service:/app
+    command: sh -c "celery -A app.celery_app.celery_app worker -l info"
+    env_file:
+      - ./ai_service/.env
+    environment:
+      CELERY_BROKER_URL: "amqp://route_user:route_pass@rabbitmq:5672/route_vhost"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/2"
+    depends_on:
+      qdrant:
+        condition: service_started
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - ai_net
+      - default
+
+  ai_db:
+    image: postgres:16-alpine
+    container_name: route_ai_db
+    env_file:
+      - ./ai_service/.env
+    networks:
+      - ai_net
+    volumes:
+      - ai_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d route_ai_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  qdrant:
+    image: qdrant/qdrant:v1.15.1
+    container_name: route_qdrant
+    networks:
+      - ai_net
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: route_prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+    volumes:
+      - ./infra/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/monitoring/prometheus-alert-rules.yml:/etc/prometheus/prometheus-alert-rules.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      - backend
+      - ai_service
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: route_grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: "admin"
+      GF_SECURITY_ADMIN_PASSWORD: "admin123"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+
+  redis_exporter:
+    image: oliver006/redis_exporter:v1.64.0
+    container_name: route_redis_exporter
+    environment:
+      REDIS_ADDR: "redis://redis:6379"
+    depends_on:
+      - redis
+    ports:
+      - "9121:9121"
+
+  rabbitmq_exporter:
+    image: kbudde/rabbitmq-exporter:latest
+    container_name: route_rabbitmq_exporter
+    environment:
+      RABBIT_URL: "http://rabbitmq:15672"
+      RABBIT_USER: "route_user"
+      RABBIT_PASSWORD: "route_pass"
+      PUBLISH_PORT: "9419"
+      OUTPUT_FORMAT: "TTY"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "9419:9419"
+
+  postgres_exporter_core:
+    image: prometheuscommunity/postgres-exporter:v0.16.0
+    container_name: route_postgres_exporter_core
+    environment:
+      DATA_SOURCE_NAME: "postgresql://postgres:asdf1234%23%2B@db:5432/route_db?sslmode=disable"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "9187:9187"
+
+  postgres_exporter_ai:
+    image: prometheuscommunity/postgres-exporter:v0.16.0
+    container_name: route_postgres_exporter_ai
+    environment:
+      DATA_SOURCE_NAME: "postgresql://postgres:asdf1234%23%2B@ai_db:5432/route_ai_db?sslmode=disable"
+    depends_on:
+      ai_db:
+        condition: service_healthy
+    ports:
+      - "9188:9187"
+    networks:
+      - ai_net
+      - default
+
+  mongodb_exporter:
+    image: percona/mongodb_exporter:0.40.0
+    container_name: route_mongodb_exporter
+    command:
+      - "--mongodb.uri=mongodb://mongo:27017"
+      - "--web.listen-address=:9216"
+    depends_on:
+      - mongo
+    ports:
+      - "9216:9216"
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  mongo_data:
+  ai_postgres_data:
+  qdrant_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  ai_net:
+    name: route_ai_net

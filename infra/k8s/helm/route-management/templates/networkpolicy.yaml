@@ -1,0 +1,211 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "route-management.fullname" . }}-default-deny
+  namespace: {{ include "route-management.namespace" . }}
+  labels:
+    {{- include "route-management.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "route-management.fullname" . }}-allow-dns-egress
+  namespace: {{ include "route-management.namespace" . }}
+  labels:
+    {{- include "route-management.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "route-management.fullname" . }}-allow-ingress-to-web
+  namespace: {{ include "route-management.namespace" . }}
+  labels:
+    {{- include "route-management.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "route-management.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: gateway
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 80
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "route-management.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: backend
+      ports:
+        - protocol: TCP
+          port: {{ .Values.backend.service.port }}
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "route-management.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: ai-service
+      ports:
+        - protocol: TCP
+          port: {{ .Values.aiService.service.port }}
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "route-management.fullname" . }}-allow-app-tier
+  namespace: {{ include "route-management.namespace" . }}
+  labels:
+    {{- include "route-management.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values:
+          - backend
+          - ai-service
+          - celery-worker
+          - ai-celery-worker
+          - celery-beat
+          - frontend
+          - prometheus
+          - grafana
+          - redis-exporter
+          - rabbitmq-exporter
+          - postgres-core-exporter
+          - postgres-ai-exporter
+          - mongodb-exporter
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "route-management.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: gateway
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values:
+                  - backend
+                  - ai-service
+                  - celery-worker
+                  - ai-celery-worker
+                  - celery-beat
+                  - migration-job
+                  - prometheus
+  egress:
+    - to:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values:
+                  - backend
+                  - ai-service
+                  - celery-worker
+                  - ai-celery-worker
+                  - celery-beat
+                  - migration-job
+                  - postgres-core
+                  - postgres-ai
+                  - redis
+                  - rabbitmq
+                  - mongo
+                  - qdrant
+                  - prometheus
+                  - grafana
+                  - redis-exporter
+                  - rabbitmq-exporter
+                  - postgres-core-exporter
+                  - postgres-ai-exporter
+                  - mongodb-exporter
+                  - frontend
+                  - gateway
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "route-management.fullname" . }}-allow-stateful-ingress
+  namespace: {{ include "route-management.namespace" . }}
+  labels:
+    {{- include "route-management.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values:
+          - postgres-core
+          - postgres-ai
+          - redis
+          - rabbitmq
+          - mongo
+          - qdrant
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values:
+                  - backend
+                  - ai-service
+                  - celery-worker
+                  - ai-celery-worker
+                  - celery-beat
+                  - migration-job
+                  - redis-exporter
+                  - rabbitmq-exporter
+                  - postgres-core-exporter
+                  - postgres-ai-exporter
+                  - mongodb-exporter
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

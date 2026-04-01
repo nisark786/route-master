@@ -1,0 +1,254 @@
+{{- if .Values.exporters.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "route-management.fullname" . }}-redis-exporter
+  namespace: {{ include "route-management.namespace" . }}
+  labels:
+    {{- include "route-management.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "route-management.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: redis-exporter
+  template:
+    metadata:
+      labels:
+        {{- include "route-management.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: redis-exporter
+    spec:
+      containers:
+        - name: redis-exporter
+          image: "{{ .Values.images.redisExporter.repository }}:{{ .Values.images.redisExporter.tag }}"
+          imagePullPolicy: {{ .Values.images.redisExporter.pullPolicy }}
+          env:
+            - name: REDIS_ADDR
+              value: "redis://{{ include "route-management.fullname" . }}-redis:{{ .Values.redis.service.port }}"
+          ports:
+            - containerPort: 9121
+              name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "route-management.fullname" . }}-redis-exporter
+  namespace: {{ include "route-management.namespace" . }}
+spec:
+  selector:
+    {{- include "route-management.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: redis-exporter
+  ports:
+    - name: http
+      port: 9121
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "route-management.fullname" . }}-rabbitmq-exporter
+  namespace: {{ include "route-management.namespace" . }}
+  labels:
+    {{- include "route-management.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "route-management.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: rabbitmq-exporter
+  template:
+    metadata:
+      labels:
+        {{- include "route-management.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: rabbitmq-exporter
+    spec:
+      containers:
+        - name: rabbitmq-exporter
+          image: "{{ .Values.images.rabbitmqExporter.repository }}:{{ .Values.images.rabbitmqExporter.tag }}"
+          imagePullPolicy: {{ .Values.images.rabbitmqExporter.pullPolicy }}
+          env:
+            - name: RABBIT_URL
+              value: "http://{{ include "route-management.fullname" . }}-rabbitmq:{{ .Values.rabbitmq.service.managementPort }}"
+            - name: RABBIT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "route-management.fullname" . }}-rabbitmq-secrets
+                  key: username
+            - name: RABBIT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "route-management.fullname" . }}-rabbitmq-secrets
+                  key: password
+            - name: PUBLISH_PORT
+              value: "9419"
+            - name: OUTPUT_FORMAT
+              value: "TTY"
+          ports:
+            - containerPort: 9419
+              name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "route-management.fullname" . }}-rabbitmq-exporter
+  namespace: {{ include "route-management.namespace" . }}
+spec:
+  selector:
+    {{- include "route-management.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: rabbitmq-exporter
+  ports:
+    - name: http
+      port: 9419
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "route-management.fullname" . }}-postgres-core-exporter
+  namespace: {{ include "route-management.namespace" . }}
+  labels:
+    {{- include "route-management.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "route-management.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: postgres-core-exporter
+  template:
+    metadata:
+      labels:
+        {{- include "route-management.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: postgres-core-exporter
+    spec:
+      containers:
+        - name: postgres-core-exporter
+          image: "{{ .Values.images.postgresExporter.repository }}:{{ .Values.images.postgresExporter.tag }}"
+          imagePullPolicy: {{ .Values.images.postgresExporter.pullPolicy }}
+          env:
+            - name: DATA_SOURCE_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "route-management.fullname" . }}-app-secrets
+                  key: DB_PASSWORD
+          command:
+            - /bin/sh
+            - -c
+            - >
+              export DATA_SOURCE_NAME="postgresql://{{ .Values.config.core.DB_USER }}:${DATA_SOURCE_NAME}@{{ include "route-management.fullname" . }}-postgres-core:{{ .Values.postgresCore.service.port }}/{{ .Values.config.core.DB_NAME }}?sslmode=disable";
+              /bin/postgres_exporter
+          ports:
+            - containerPort: 9187
+              name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "route-management.fullname" . }}-postgres-core-exporter
+  namespace: {{ include "route-management.namespace" . }}
+spec:
+  selector:
+    {{- include "route-management.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres-core-exporter
+  ports:
+    - name: http
+      port: 9187
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "route-management.fullname" . }}-postgres-ai-exporter
+  namespace: {{ include "route-management.namespace" . }}
+  labels:
+    {{- include "route-management.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "route-management.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: postgres-ai-exporter
+  template:
+    metadata:
+      labels:
+        {{- include "route-management.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: postgres-ai-exporter
+    spec:
+      containers:
+        - name: postgres-ai-exporter
+          image: "{{ .Values.images.postgresExporter.repository }}:{{ .Values.images.postgresExporter.tag }}"
+          imagePullPolicy: {{ .Values.images.postgresExporter.pullPolicy }}
+          env:
+            - name: DATA_SOURCE_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "route-management.fullname" . }}-app-secrets
+                  key: AI_DB_PASSWORD
+          command:
+            - /bin/sh
+            - -c
+            - >
+              export DATA_SOURCE_NAME="postgresql://{{ .Values.config.ai.AI_DB_USER }}:${DATA_SOURCE_NAME}@{{ include "route-management.fullname" . }}-postgres-ai:{{ .Values.postgresAi.service.port }}/{{ .Values.config.ai.AI_DB_NAME }}?sslmode=disable";
+              /bin/postgres_exporter
+          ports:
+            - containerPort: 9187
+              name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "route-management.fullname" . }}-postgres-ai-exporter
+  namespace: {{ include "route-management.namespace" . }}
+spec:
+  selector:
+    {{- include "route-management.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres-ai-exporter
+  ports:
+    - name: http
+      port: 9187
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "route-management.fullname" . }}-mongodb-exporter
+  namespace: {{ include "route-management.namespace" . }}
+  labels:
+    {{- include "route-management.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "route-management.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: mongodb-exporter
+  template:
+    metadata:
+      labels:
+        {{- include "route-management.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: mongodb-exporter
+    spec:
+      containers:
+        - name: mongodb-exporter
+          image: "{{ .Values.images.mongodbExporter.repository }}:{{ .Values.images.mongodbExporter.tag }}"
+          imagePullPolicy: {{ .Values.images.mongodbExporter.pullPolicy }}
+          args:
+            - "--mongodb.uri=mongodb://{{ include "route-management.fullname" . }}-mongo:{{ .Values.mongo.service.port }}"
+            - "--web.listen-address=:9216"
+          ports:
+            - containerPort: 9216
+              name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "route-management.fullname" . }}-mongodb-exporter
+  namespace: {{ include "route-management.namespace" . }}
+spec:
+  selector:
+    {{- include "route-management.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: mongodb-exporter
+  ports:
+    - name: http
+      port: 9216
+      targetPort: http
+{{- end }}
+---

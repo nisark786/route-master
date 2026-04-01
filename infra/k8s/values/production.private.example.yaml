@@ -1,0 +1,41 @@
+secrets:
+  core:
+    SECRET_KEY: "replace-with-strong-django-secret"
+    DB_PASSWORD: "replace-with-core-db-password"
+    RAZORPAY_KEY_ID: "replace-with-live-key-id"
+    RAZORPAY_KEY_SECRET: "replace-with-live-key-secret"
+    EMAIL_HOST_USER: "replace-with-smtp-user"
+    EMAIL_HOST_PASSWORD: "replace-with-smtp-password"
+    DEFAULT_FROM_EMAIL: "RouteMaster <noreply@example.com>"
+    AWS_ACCESS_KEY_ID: "replace-with-iam-access-key-id"
+    AWS_SECRET_ACCESS_KEY: "replace-with-iam-access-key-secret"
+    AWS_SESSION_TOKEN: ""
+    AWS_STORAGE_BUCKET_NAME: "replace-with-s3-bucket-name"
+    AWS_S3_REGION_NAME: "ap-south-1"
+    AWS_S3_CUSTOM_DOMAIN: "replace-with-cloudfront-domain"
+    AI_INTERNAL_AUTH_SECRET: "replace-with-internal-auth-secret"
+  ai:
+    OPENAI_API_KEY: ""
+    HUGGINGFACE_API_KEY: "replace-with-hf-key-or-keep-empty-if-not-used"
+    QDRANT_API_KEY: ""
+    AI_DB_PASSWORD: "replace-with-ai-db-password"
+    AUTH_JWT_SECRET: "replace-with-ai-jwt-secret"
+    AUTH_INTERNAL_TOKEN_SECRET: "replace-with-ai-internal-secret"
+  rabbitmq:
+    username: "replace-with-rabbitmq-username"
+    password: "replace-with-rabbitmq-password"
+    vhost: "replace-with-rabbitmq-vhost"
+  grafana:
+    adminUser: "replace-with-grafana-admin-user"
+    adminPassword: "replace-with-grafana-admin-password"
+
+images:
+  backend:
+    repository: "<aws-account-id>.dkr.ecr.ap-south-1.amazonaws.com/route-management/backend"
+    tag: "release-2026-04-01"
+  aiService:
+    repository: "<aws-account-id>.dkr.ecr.ap-south-1.amazonaws.com/route-management/ai-service"
+    tag: "release-2026-04-01"
+  frontend:
+    repository: "<aws-account-id>.dkr.ecr.ap-south-1.amazonaws.com/route-management/frontend"
+    tag: "release-2026-04-01"

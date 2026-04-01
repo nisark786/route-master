@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "route-management.fullname" . }}-ai-config
+  namespace: {{ include "route-management.namespace" . }}
+  labels:
+    {{- include "route-management.labels" . | nindent 4 }}
+data:
+  AI_APP_NAME: {{ .Values.config.ai.AI_APP_NAME | quote }}
+  AI_APP_VERSION: {{ .Values.config.ai.AI_APP_VERSION | quote }}
+  CELERY_BROKER_URL: {{ printf "amqp://%s:%s@%s-rabbitmq:%s/%s" .Values.secrets.rabbitmq.username .Values.secrets.rabbitmq.password (include "route-management.fullname" .) (.Values.rabbitmq.service.amqpPort | toString) .Values.secrets.rabbitmq.vhost | quote }}
+  CELERY_RESULT_BACKEND: {{ printf "redis://%s-redis:%v/2" (include "route-management.fullname" .) .Values.redis.service.port | quote }}
+  CELERY_RESULT_EXPIRES_SECONDS: {{ .Values.config.ai.CELERY_RESULT_EXPIRES_SECONDS | quote }}
+  JOB_REGISTRY_TTL_SECONDS: {{ .Values.config.ai.JOB_REGISTRY_TTL_SECONDS | quote }}
+  AI_DB_HOST: {{ printf "%s-postgres-ai" (include "route-management.fullname" .) | quote }}
+  AI_DB_PORT: {{ .Values.config.ai.AI_DB_PORT | quote }}
+  AI_DB_NAME: {{ .Values.config.ai.AI_DB_NAME | quote }}
+  AI_DB_USER: {{ .Values.config.ai.AI_DB_USER | quote }}
+  QDRANT_URL: {{ printf "http://%s-qdrant:%v" (include "route-management.fullname" .) .Values.qdrant.service.httpPort | quote }}
+  QDRANT_COLLECTION: {{ .Values.config.ai.QDRANT_COLLECTION | quote }}
+  QDRANT_DISTANCE: {{ .Values.config.ai.QDRANT_DISTANCE | quote }}
+  EMBEDDING_PROVIDER: {{ .Values.config.ai.EMBEDDING_PROVIDER | quote }}
+  EMBEDDING_DIM: {{ .Values.config.ai.EMBEDDING_DIM | quote }}
+  HF_EMBEDDING_MODEL: {{ .Values.config.ai.HF_EMBEDDING_MODEL | quote }}
+  HF_LLM_MODEL: {{ .Values.config.ai.HF_LLM_MODEL | quote }}
+  CHUNK_SIZE: {{ .Values.config.ai.CHUNK_SIZE | quote }}
+  CHUNK_OVERLAP: {{ .Values.config.ai.CHUNK_OVERLAP | quote }}
+  RAG_TOP_K: {{ .Values.config.ai.RAG_TOP_K | quote }}
+  RAG_MAX_CONTEXT_CHARS: {{ .Values.config.ai.RAG_MAX_CONTEXT_CHARS | quote }}
+  RAG_TEMPERATURE: {{ .Values.config.ai.RAG_TEMPERATURE | quote }}
+  RAG_MAX_NEW_TOKENS: {{ .Values.config.ai.RAG_MAX_NEW_TOKENS | quote }}
+  AUTH_JWT_ALGORITHM: {{ .Values.config.ai.AUTH_JWT_ALGORITHM | quote }}
+  AUTH_JWT_ISSUER: {{ .Values.config.ai.AUTH_JWT_ISSUER | quote }}
+  AUTH_JWT_AUDIENCE: {{ .Values.config.ai.AUTH_JWT_AUDIENCE | quote }}
+  AUTH_INTERNAL_TOKEN_ALGORITHM: {{ .Values.config.ai.AUTH_INTERNAL_TOKEN_ALGORITHM | quote }}
+  AUTH_INTERNAL_TOKEN_ISSUER: {{ .Values.config.ai.AUTH_INTERNAL_TOKEN_ISSUER | quote }}
+  AUTH_INTERNAL_TOKEN_AUDIENCE: {{ .Values.config.ai.AUTH_INTERNAL_TOKEN_AUDIENCE | quote }}
+  AUTH_INTERNAL_ALLOWED_SERVICES: {{ .Values.config.ai.AUTH_INTERNAL_ALLOWED_SERVICES | quote }}
+  CORE_AUTH_ME_URL: {{ printf "http://%s-backend:%v/api/auth/me/" (include "route-management.fullname" .) .Values.backend.service.port | quote }}
+  AUTH_PERMISSIONS_FROM_CORE: {{ .Values.config.ai.AUTH_PERMISSIONS_FROM_CORE | quote }}
+  AUTH_PERMISSIONS_CACHE_SECONDS: {{ .Values.config.ai.AUTH_PERMISSIONS_CACHE_SECONDS | quote }}
+  AUTH_CORE_TIMEOUT_SECONDS: {{ .Values.config.ai.AUTH_CORE_TIMEOUT_SECONDS | quote }}
+  AUTHZ_STRICT: {{ .Values.config.ai.AUTHZ_STRICT | quote }}
+  AUTH_ROLE_FALLBACK_ENABLED: {{ .Values.config.ai.AUTH_ROLE_FALLBACK_ENABLED | quote }}
+---

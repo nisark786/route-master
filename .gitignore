@@ -1,0 +1,75 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+.venv/
+venv/
+env/
+**/.venv/
+**/venv/
+**/env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node / frontend
+node_modules/
+dist/
+build/
+.next/
+coverage/
+
+# Flutter / mobile
+.dart_tool/
+.packages
+build/
+android/.gradle/
+ios/Pods/
+
+# Env and secrets
+.env
+**/.env
+*.pem
+*.key
+*.p12
+*.jks
+*.crt
+*.pfx
+
+# Firebase / cloud credentials
+*service-account*.json
+core_services/firebase/*.json
+**/google-services.json
+**/GoogleService-Info.plist
+
+# Private deployment values / kube secrets
+infra/k8s/values/production.private.yaml
+infra/k8s/values/*.private.yaml
+
+# Terraform / IaC local state
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Local runtime data
+media/
+staticfiles/
+logs/
+*.log
+core_services/celerybeat-schedule
+infra/k8s/values/*.generated.yaml

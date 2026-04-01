@@ -1,0 +1,200 @@
+global:
+  createNamespace: true
+  namespaceOverride: route-staging
+
+config:
+  core:
+    DEBUG: "True"
+    ALLOWED_HOSTS: "localhost,127.0.0.1,testserver,backend,route-management-backend,route-management-frontend,route-management-gateway,staging.route.local"
+    CORS_ALLOWED_ORIGINS: "http://localhost:8080,http://127.0.0.1:8080,http://localhost:5173,http://127.0.0.1:5173"
+    SEND_OTP_ASYNC: "True"
+    EMAIL_BACKEND: "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_HOST: "smtp.gmail.com"
+    EMAIL_PORT: "587"
+    EMAIL_USE_TLS: "True"
+    USE_S3_MEDIA: "False"
+    AWS_S3_MEDIA_PREFIX: "media"
+    AWS_QUERYSTRING_AUTH: "False"
+  ai:
+    QDRANT_COLLECTION: "route_docs_hf"
+    EMBEDDING_PROVIDER: "huggingface"
+  frontend:
+    VITE_DIRECT_MEDIA_UPLOAD: "False"
+
+secrets:
+  core:
+    SECRET_KEY: "dev-secret-key-change-this-to-at-least-32-characters"
+    DB_PASSWORD: "change-me-core-db-password"
+    RAZORPAY_KEY_ID: "__REQUIRED__"
+    RAZORPAY_KEY_SECRET: "__REQUIRED__"
+    EMAIL_HOST_USER: "__REQUIRED__"
+    EMAIL_HOST_PASSWORD: "__REQUIRED__"
+    DEFAULT_FROM_EMAIL: "RouteMaster <__REQUIRED__>"
+    AWS_ACCESS_KEY_ID: "__REQUIRED__"
+    AWS_SECRET_ACCESS_KEY: "__REQUIRED__"
+    AWS_SESSION_TOKEN: ""
+    AWS_STORAGE_BUCKET_NAME: "nisar-route-master-123"
+    AWS_S3_REGION_NAME: "ap-south-1"
+    AWS_S3_CUSTOM_DOMAIN: "d3t07g2wsvfmk9.cloudfront.net"
+    AI_INTERNAL_AUTH_SECRET: "dev-internal-ai-auth-secret-change-this"
+  ai:
+    HUGGINGFACE_API_KEY: "__REQUIRED__"
+    AI_DB_PASSWORD: "change-me-ai-db-password"
+    AUTH_JWT_SECRET: "dev-secret-key-change-this-to-at-least-32-characters"
+    AUTH_INTERNAL_TOKEN_SECRET: "dev-internal-ai-auth-secret-change-this"
+
+ingress:
+  hosts:
+    - host: staging.route.local
+      paths:
+        - path: /api
+          pathType: Prefix
+          service: gateway
+          port: 80
+        - path: /ws
+          pathType: Prefix
+          service: gateway
+          port: 80
+        - path: /
+          pathType: Prefix
+          service: frontend
+          port: 80
+
+backend:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
+  autoscaling:
+    enabled: false
+
+aiService:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
+  autoscaling:
+    enabled: false
+
+celeryWorker:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
+
+aiCeleryWorker:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
+
+celeryBeat:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+frontend:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 96Mi
+    limits:
+      cpu: 250m
+      memory: 192Mi
+
+gateway:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  autoscaling:
+    enabled: false
+
+postgresCore:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
+
+postgresAi:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
+
+redis:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+rabbitmq:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 384Mi
+
+mongo:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 384Mi
+
+qdrant:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+prometheus:
+  enabled: false
+
+grafana:
+  enabled: false
+
+exporters:
+  enabled: false

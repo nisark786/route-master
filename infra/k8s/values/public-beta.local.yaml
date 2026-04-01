@@ -1,0 +1,175 @@
+global:
+  createNamespace: true
+  namespaceOverride: route-prod
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: localhost
+      paths:
+        - path: /api
+          pathType: Prefix
+          service: gateway
+          port: 80
+        - path: /ws
+          pathType: Prefix
+          service: gateway
+          port: 80
+        - path: /
+          pathType: Prefix
+          service: frontend
+          port: 80
+  tls: []
+
+config:
+  core:
+    DEBUG: "False"
+    ALLOWED_HOSTS: "localhost,127.0.0.1"
+    CORS_ALLOWED_ORIGINS: "http://localhost,http://127.0.0.1"
+    USE_S3_MEDIA: "True"
+    AWS_S3_MEDIA_PREFIX: "media"
+    AWS_QUERYSTRING_AUTH: "False"
+  ai:
+    EMBEDDING_PROVIDER: "huggingface"
+    QDRANT_COLLECTION: "route_docs_prod"
+
+backend:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 75m
+      memory: 256Mi
+    limits:
+      cpu: 400m
+      memory: 768Mi
+  autoscaling:
+    enabled: false
+
+aiService:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 75m
+      memory: 256Mi
+    limits:
+      cpu: 400m
+      memory: 768Mi
+  autoscaling:
+    enabled: false
+
+celeryWorker:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 300m
+      memory: 512Mi
+
+aiCeleryWorker:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 300m
+      memory: 512Mi
+
+celeryBeat:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 30m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+frontend:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 30m
+      memory: 96Mi
+    limits:
+      cpu: 200m
+      memory: 192Mi
+
+gateway:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+  autoscaling:
+    enabled: false
+
+postgresCore:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 400m
+      memory: 768Mi
+
+postgresAi:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 400m
+      memory: 768Mi
+
+redis:
+  resources:
+    requests:
+      cpu: 30m
+      memory: 96Mi
+    limits:
+      cpu: 150m
+      memory: 256Mi
+
+rabbitmq:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 384Mi
+
+mongo:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 384Mi
+
+qdrant:
+  resources:
+    requests:
+      cpu: 75m
+      memory: 256Mi
+    limits:
+      cpu: 350m
+      memory: 512Mi
+
+prometheus:
+  enabled: false
+
+grafana:
+  enabled: false
+
+exporters:
+  enabled: false

@@ -1,0 +1,58 @@
+global:
+  createNamespace: true
+  namespaceOverride: route-prod
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: "__NIP_IO_HOST__"
+      paths:
+        - path: /api
+          pathType: Prefix
+          service: gateway
+          port: 80
+        - path: /ws
+          pathType: Prefix
+          service: gateway
+          port: 80
+        - path: /
+          pathType: Prefix
+          service: frontend
+          port: 80
+  tls:
+    - secretName: route-prod-tls
+      hosts:
+        - "__NIP_IO_HOST__"
+
+config:
+  core:
+    DEBUG: "False"
+    ALLOWED_HOSTS: "__NIP_IO_HOST__"
+    CORS_ALLOWED_ORIGINS: "https://__NIP_IO_HOST__"
+    USE_S3_MEDIA: "True"
+    AWS_S3_MEDIA_PREFIX: "media"
+    AWS_QUERYSTRING_AUTH: "False"
+  ai:
+    EMBEDDING_PROVIDER: "huggingface"
+    QDRANT_COLLECTION: "route_docs_prod"
+
+backend:
+  replicas: 2
+
+aiService:
+  replicas: 2
+
+celeryWorker:
+  replicas: 2
+
+aiCeleryWorker:
+  replicas: 2
+
+frontend:
+  replicas: 2
+
+gateway:
+  replicas: 2

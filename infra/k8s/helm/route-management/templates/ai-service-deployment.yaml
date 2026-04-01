@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "route-management.fullname" . }}-ai-service
+  namespace: {{ include "route-management.namespace" . }}
+  labels:
+    {{- include "route-management.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ai-service
+spec:
+  replicas: {{ .Values.aiService.replicas }}
+  selector:
+    matchLabels:
+      {{- include "route-management.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: ai-service
+  template:
+    metadata:
+      labels:
+        {{- include "route-management.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: ai-service
+    spec:
+      serviceAccountName: {{ include "route-management.serviceAccountName" . }}
+      containers:
+        - name: ai-service
+          image: "{{ .Values.images.aiService.repository }}:{{ .Values.images.aiService.tag }}"
+          imagePullPolicy: {{ .Values.images.aiService.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.aiService.service.port }}
+              name: http
+          envFrom:
+            - configMapRef:
+                name: {{ include "route-management.fullname" . }}-ai-config
+            - secretRef:
+                name: {{ include "route-management.fullname" . }}-app-secrets
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            timeoutSeconds: 5
+            failureThreshold: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.aiService.resources | nindent 12 }}
+---

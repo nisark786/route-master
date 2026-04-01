@@ -1,0 +1,14 @@
+{{- if .Values.frontend.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "route-management.fullname" . }}-frontend-config
+  namespace: {{ include "route-management.namespace" . }}
+  labels:
+    {{- include "route-management.labels" . | nindent 4 }}
+data:
+  {{- range $key, $value := .Values.config.frontend }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+---
+{{- end }}

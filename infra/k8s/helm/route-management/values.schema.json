@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "global": {
+      "type": "object",
+      "properties": {
+        "createNamespace": { "type": "boolean" },
+        "namespaceOverride": { "type": "string" },
+        "storageClass": { "type": "string" }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "className": { "type": "string" },
+        "hosts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["host", "paths"],
+            "properties": {
+              "host": { "type": "string", "minLength": 1 },
+              "paths": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "required": ["path", "pathType", "service", "port"],
+                  "properties": {
+                    "path": { "type": "string" },
+                    "pathType": { "type": "string" },
+                    "service": { "type": "string" },
+                    "port": { "type": "integer", "minimum": 1 }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "images": {
+      "type": "object",
+      "required": ["backend", "aiService", "frontend", "gateway"],
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "repository": { "type": "string", "minLength": 1 },
+          "tag": { "type": ["string", "number"] },
+          "pullPolicy": { "type": "string" }
+        },
+        "required": ["repository", "tag", "pullPolicy"]
+      }
+    },
+    "backend": { "$ref": "#/$defs/scalableWorkload" },
+    "aiService": { "$ref": "#/$defs/scalableWorkload" },
+    "gateway": { "$ref": "#/$defs/scalableWorkload" },
+    "frontend": {
+      "allOf": [
+        { "$ref": "#/$defs/scalableWorkload" },
+        {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" }
+          }
+        }
+      ]
+    },
+    "celeryWorker": { "$ref": "#/$defs/workerWorkload" },
+    "aiCeleryWorker": { "$ref": "#/$defs/workerWorkload" },
+    "celeryBeat": { "$ref": "#/$defs/workerWorkload" },
+    "postgresCore": { "$ref": "#/$defs/statefulWorkload" },
+    "postgresAi": { "$ref": "#/$defs/statefulWorkload" },
+    "redis": { "$ref": "#/$defs/statefulWorkload" },
+    "rabbitmq": { "$ref": "#/$defs/rabbitmqWorkload" },
+    "mongo": { "$ref": "#/$defs/statefulWorkload" },
+    "qdrant": { "$ref": "#/$defs/qdrantWorkload" },
+    "prometheus": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "retention": { "type": "string" },
+        "persistence": { "$ref": "#/$defs/persistence" }
+      }
+    },
+    "grafana": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "persistence": { "$ref": "#/$defs/persistence" }
+      }
+    }
+  },
+  "$defs": {
+    "resources": {
+      "type": "object",
+      "properties": {
+        "requests": { "type": "object" },
+        "limits": { "type": "object" }
+      }
+    },
+    "autoscaling": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "minReplicas": { "type": "integer", "minimum": 1 },
+        "maxReplicas": { "type": "integer", "minimum": 1 },
+        "targetCPUUtilizationPercentage": { "type": "integer", "minimum": 1, "maximum": 100 }
+      }
+    },
+    "pdb": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "minAvailable": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "service": {
+      "type": "object",
+      "properties": {
+        "port": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "persistence": {
+      "type": "object",
+      "required": ["size"],
+      "properties": {
+        "size": { "type": "string", "minLength": 2 }
+      }
+    },
+    "scalableWorkload": {
+      "type": "object",
+      "properties": {
+        "replicas": { "type": "integer", "minimum": 1 },
+        "service": { "$ref": "#/$defs/service" },
+        "resources": { "$ref": "#/$defs/resources" },
+        "autoscaling": { "$ref": "#/$defs/autoscaling" },
+        "pdb": { "$ref": "#/$defs/pdb" }
+      }
+    },
+    "workerWorkload": {
+      "type": "object",
+      "properties": {
+        "replicas": { "type": "integer", "minimum": 1 },
+        "resources": { "$ref": "#/$defs/resources" }
+      }
+    },
+    "statefulWorkload": {
+      "type": "object",
+      "properties": {
+        "replicas": { "type": "integer", "minimum": 1 },
+        "service": { "$ref": "#/$defs/service" },
+        "persistence": { "$ref": "#/$defs/persistence" },
+        "resources": { "$ref": "#/$defs/resources" }
+      }
+    },
+    "rabbitmqWorkload": {
+      "type": "object",
+      "properties": {
+        "replicas": { "type": "integer", "minimum": 1 },
+        "service": {
+          "type": "object",
+          "properties": {
+            "amqpPort": { "type": "integer", "minimum": 1 },
+            "managementPort": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "persistence": { "$ref": "#/$defs/persistence" },
+        "resources": { "$ref": "#/$defs/resources" }
+      }
+    },
+    "qdrantWorkload": {
+      "type": "object",
+      "properties": {
+        "replicas": { "type": "integer", "minimum": 1 },
+        "service": {
+          "type": "object",
+          "properties": {
+            "httpPort": { "type": "integer", "minimum": 1 },
+            "grpcPort": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "persistence": { "$ref": "#/$defs/persistence" },
+        "resources": { "$ref": "#/$defs/resources" }
+      }
+    }
+  }
+}

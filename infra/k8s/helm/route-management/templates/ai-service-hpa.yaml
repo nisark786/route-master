@@ -1,0 +1,24 @@
+{{- if .Values.aiService.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "route-management.fullname" . }}-ai-service
+  namespace: {{ include "route-management.namespace" . }}
+  labels:
+    {{- include "route-management.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "route-management.fullname" . }}-ai-service
+  minReplicas: {{ .Values.aiService.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.aiService.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.aiService.autoscaling.targetCPUUtilizationPercentage }}
+---
+{{- end }}

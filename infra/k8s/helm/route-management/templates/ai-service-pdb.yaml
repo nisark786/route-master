@@ -1,0 +1,16 @@
+{{- if .Values.aiService.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "route-management.fullname" . }}-ai-service
+  namespace: {{ include "route-management.namespace" . }}
+  labels:
+    {{- include "route-management.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.aiService.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "route-management.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: ai-service
+---
+{{- end }}

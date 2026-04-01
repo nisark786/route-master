@@ -1,0 +1,88 @@
+global:
+  createNamespace: true
+  namespaceOverride: route-prod
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: route.example.com
+      paths:
+        - path: /api
+          pathType: Prefix
+          service: gateway
+          port: 80
+        - path: /ws
+          pathType: Prefix
+          service: gateway
+          port: 80
+        - path: /
+          pathType: Prefix
+          service: frontend
+          port: 80
+  tls:
+    - secretName: route-prod-tls
+      hosts:
+        - route.example.com
+
+config:
+  core:
+    DEBUG: "False"
+    ALLOWED_HOSTS: "route.example.com"
+    CORS_ALLOWED_ORIGINS: "https://route.example.com"
+    USE_S3_MEDIA: "True"
+    AWS_S3_MEDIA_PREFIX: "media"
+    AWS_QUERYSTRING_AUTH: "False"
+  ai:
+    EMBEDDING_PROVIDER: "huggingface"
+    QDRANT_COLLECTION: "route_docs_prod"
+
+secrets:
+  core:
+    SECRET_KEY: "__REQUIRED__"
+    DB_PASSWORD: "__REQUIRED__"
+    RAZORPAY_KEY_ID: "__REQUIRED__"
+    RAZORPAY_KEY_SECRET: "__REQUIRED__"
+    EMAIL_HOST_USER: "__REQUIRED__"
+    EMAIL_HOST_PASSWORD: "__REQUIRED__"
+    DEFAULT_FROM_EMAIL: "__REQUIRED__"
+    AWS_ACCESS_KEY_ID: "__REQUIRED__"
+    AWS_SECRET_ACCESS_KEY: "__REQUIRED__"
+    AWS_SESSION_TOKEN: ""
+    AWS_STORAGE_BUCKET_NAME: "__REQUIRED__"
+    AWS_S3_REGION_NAME: "__REQUIRED__"
+    AWS_S3_CUSTOM_DOMAIN: "__REQUIRED__"
+    AI_INTERNAL_AUTH_SECRET: "__REQUIRED__"
+  ai:
+    OPENAI_API_KEY: ""
+    HUGGINGFACE_API_KEY: "__REQUIRED__"
+    QDRANT_API_KEY: ""
+    AI_DB_PASSWORD: "__REQUIRED__"
+    AUTH_JWT_SECRET: "__REQUIRED__"
+    AUTH_INTERNAL_TOKEN_SECRET: "__REQUIRED__"
+  rabbitmq:
+    username: "__REQUIRED__"
+    password: "__REQUIRED__"
+    vhost: "__REQUIRED__"
+  grafana:
+    adminUser: "__REQUIRED__"
+    adminPassword: "__REQUIRED__"
+
+backend:
+  replicas: 3
+
+aiService:
+  replicas: 2
+
+celeryWorker:
+  replicas: 2
+
+aiCeleryWorker:
+  replicas: 2
+
+frontend:
+  replicas: 2
+
+gateway:
+  replicas: 2

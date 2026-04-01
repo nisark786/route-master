@@ -1,0 +1,408 @@
+global:
+  createNamespace: false
+  namespaceOverride: ""
+  imagePullSecrets: []
+  storageClass: ""
+
+serviceAccount:
+  create: true
+  name: ""
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: route.local
+      paths:
+        - path: /api
+          pathType: Prefix
+          service: gateway
+          port: 80
+        - path: /ws
+          pathType: Prefix
+          service: gateway
+          port: 80
+        - path: /
+          pathType: Prefix
+          service: frontend
+          port: 80
+  tls: []
+
+config:
+  core:
+    DEBUG: "False"
+    ALLOWED_HOSTS: "route.local,localhost,127.0.0.1,backend"
+    CORS_ALLOWED_ORIGINS: "https://route.local,http://localhost:5173,http://127.0.0.1:5173"
+    DB_ENGINE: "django.contrib.gis.db.backends.postgis"
+    DB_PORT: "5432"
+    DB_NAME: "route_db"
+    DB_USER: "postgres"
+    USE_REDIS_CACHE: "True"
+    MONGO_DB_NAME: "route_tracking"
+    MONGO_LOCATIONS_COLLECTION: "driver_locations"
+    SEND_OTP_ASYNC: "True"
+    EMAIL_BACKEND: "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_HOST: "smtp.gmail.com"
+    EMAIL_PORT: "587"
+    EMAIL_USE_TLS: "True"
+    AI_AUTOSYNC_ENABLED: "True"
+    AI_AUTOSYNC_INTERVAL_MINUTES: "15"
+    USE_S3_MEDIA: "False"
+    AWS_S3_MEDIA_PREFIX: "media"
+    AWS_QUERYSTRING_AUTH: "False"
+  ai:
+    AI_APP_NAME: "Route AI Service"
+    AI_APP_VERSION: "1.0.0"
+    AI_DB_PORT: "5432"
+    AI_DB_NAME: "route_ai_db"
+    AI_DB_USER: "postgres"
+    QDRANT_COLLECTION: "route_docs"
+    QDRANT_DISTANCE: "cosine"
+    EMBEDDING_PROVIDER: "hash"
+    EMBEDDING_DIM: "384"
+    HF_EMBEDDING_MODEL: "sentence-transformers/all-MiniLM-L6-v2"
+    HF_LLM_MODEL: "mistralai/Mistral-7B-Instruct-v0.2"
+    CHUNK_SIZE: "800"
+    CHUNK_OVERLAP: "120"
+    RAG_TOP_K: "5"
+    RAG_MAX_CONTEXT_CHARS: "5000"
+    RAG_TEMPERATURE: "0.2"
+    RAG_MAX_NEW_TOKENS: "400"
+    AUTH_JWT_ALGORITHM: "HS256"
+    AUTH_JWT_ISSUER: "route-management"
+    AUTH_JWT_AUDIENCE: "route-management-users"
+    AUTH_INTERNAL_TOKEN_ALGORITHM: "HS256"
+    AUTH_INTERNAL_TOKEN_ISSUER: "core_service"
+    AUTH_INTERNAL_TOKEN_AUDIENCE: "ai_service_internal"
+    AUTH_INTERNAL_ALLOWED_SERVICES: "core_service"
+    AUTH_PERMISSIONS_FROM_CORE: "true"
+    AUTH_PERMISSIONS_CACHE_SECONDS: "60"
+    AUTH_CORE_TIMEOUT_SECONDS: "3"
+    AUTHZ_STRICT: "false"
+    AUTH_ROLE_FALLBACK_ENABLED: "true"
+    CELERY_RESULT_EXPIRES_SECONDS: "3600"
+    JOB_REGISTRY_TTL_SECONDS: "7200"
+  frontend:
+    VITE_API_URL: "/api/"
+    VITE_WS_BASE_URL: ""
+    VITE_DIRECT_MEDIA_UPLOAD: "True"
+
+secrets:
+  core:
+    SECRET_KEY: "change-me-core-secret"
+    DB_PASSWORD: "change-me-core-db-password"
+    RAZORPAY_KEY_ID: ""
+    RAZORPAY_KEY_SECRET: ""
+    EMAIL_HOST_USER: ""
+    EMAIL_HOST_PASSWORD: ""
+    DEFAULT_FROM_EMAIL: ""
+    AWS_ACCESS_KEY_ID: ""
+    AWS_SECRET_ACCESS_KEY: ""
+    AWS_SESSION_TOKEN: ""
+    AWS_STORAGE_BUCKET_NAME: ""
+    AWS_S3_REGION_NAME: ""
+    AWS_S3_CUSTOM_DOMAIN: ""
+    AI_INTERNAL_AUTH_SECRET: "change-me-ai-internal-secret"
+  ai:
+    OPENAI_API_KEY: ""
+    HUGGINGFACE_API_KEY: ""
+    QDRANT_API_KEY: ""
+    AI_DB_PASSWORD: "change-me-ai-db-password"
+    AUTH_JWT_SECRET: "change-me-ai-jwt-secret"
+    AUTH_INTERNAL_TOKEN_SECRET: "change-me-ai-internal-secret"
+  rabbitmq:
+    username: "route_user"
+    password: "route_pass"
+    vhost: "route_vhost"
+  grafana:
+    adminUser: "admin"
+    adminPassword: "change-me-grafana-password"
+
+images:
+  backend:
+    repository: route-management/backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  aiService:
+    repository: route-management/ai-service
+    tag: latest
+    pullPolicy: IfNotPresent
+  frontend:
+    repository: route-management/frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  gateway:
+    repository: nginx
+    tag: "1.27-alpine"
+    pullPolicy: IfNotPresent
+  postgresCore:
+    repository: postgis/postgis
+    tag: "16-3.4"
+    pullPolicy: IfNotPresent
+  postgresAi:
+    repository: postgres
+    tag: "16-alpine"
+    pullPolicy: IfNotPresent
+  redis:
+    repository: redis
+    tag: "7-alpine"
+    pullPolicy: IfNotPresent
+  rabbitmq:
+    repository: rabbitmq
+    tag: "3-management-alpine"
+    pullPolicy: IfNotPresent
+  mongo:
+    repository: mongo
+    tag: "7"
+    pullPolicy: IfNotPresent
+  qdrant:
+    repository: qdrant/qdrant
+    tag: "v1.15.1"
+    pullPolicy: IfNotPresent
+  prometheus:
+    repository: prom/prometheus
+    tag: "v2.54.1"
+    pullPolicy: IfNotPresent
+  grafana:
+    repository: grafana/grafana
+    tag: "11.2.0"
+    pullPolicy: IfNotPresent
+  redisExporter:
+    repository: oliver006/redis_exporter
+    tag: "v1.64.0"
+    pullPolicy: IfNotPresent
+  rabbitmqExporter:
+    repository: kbudde/rabbitmq-exporter
+    tag: latest
+    pullPolicy: IfNotPresent
+  postgresExporter:
+    repository: prometheuscommunity/postgres-exporter
+    tag: "v0.16.0"
+    pullPolicy: IfNotPresent
+  mongodbExporter:
+    repository: percona/mongodb_exporter
+    tag: "0.40.0"
+    pullPolicy: IfNotPresent
+
+backend:
+  replicas: 2
+  service:
+    port: 8000
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 75
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+aiService:
+  replicas: 2
+  service:
+    port: 8001
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 75
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+celeryWorker:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+aiCeleryWorker:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+celeryBeat:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+frontend:
+  enabled: true
+  replicas: 2
+  service:
+    port: 80
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+gateway:
+  replicas: 2
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 75
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+postgresCore:
+  replicas: 1
+  service:
+    port: 5432
+  persistence:
+    size: 20Gi
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+
+postgresAi:
+  replicas: 1
+  service:
+    port: 5432
+  persistence:
+    size: 10Gi
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+
+redis:
+  replicas: 1
+  service:
+    port: 6379
+  persistence:
+    size: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+rabbitmq:
+  replicas: 1
+  service:
+    amqpPort: 5672
+    managementPort: 15672
+  persistence:
+    size: 10Gi
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+mongo:
+  replicas: 1
+  service:
+    port: 27017
+  persistence:
+    size: 10Gi
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+qdrant:
+  replicas: 1
+  service:
+    httpPort: 6333
+    grpcPort: 6334
+  persistence:
+    size: 10Gi
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+prometheus:
+  enabled: true
+  service:
+    port: 9090
+  retention: 15d
+  persistence:
+    size: 20Gi
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+
+grafana:
+  enabled: true
+  service:
+    port: 3000
+  persistence:
+    size: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+exporters:
+  enabled: true
