@@ -1,0 +1,88 @@
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to deploy (usually a Git SHA from staging)"
+        required: true
+        type: string
+      namespace:
+        description: "Kubernetes namespace"
+        required: true
+        default: "route-prod"
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}
+  RELEASE_NAME: route-management
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.30.2
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.15.4
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.PROD_KUBECONFIG_B64 }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Write production private values
+        run: |
+          cat > /tmp/production.private.yaml <<'EOF'
+          ${{ secrets.PROD_PRIVATE_VALUES_YAML }}
+          EOF
+
+      - name: Production readiness check
+        shell: pwsh
+        run: |
+          ./infra/k8s/scripts/prod-readiness-check.ps1 `
+            -ReleaseName "$env:RELEASE_NAME" `
+            -ChartPath "./infra/k8s/helm/route-management" `
+            -BaseValues "./infra/k8s/helm/route-management/values.yaml" `
+            -ProdValues "./infra/k8s/values/production.yaml" `
+            -PrivateValues "/tmp/production.private.yaml"
+
+      - name: Deploy with Helm
+        run: |
+          helm upgrade --install $RELEASE_NAME infra/k8s/helm/route-management \
+            -n ${{ github.event.inputs.namespace }} \
+            --create-namespace \
+            -f infra/k8s/helm/route-management/values.yaml \
+            -f infra/k8s/values/production.yaml \
+            -f /tmp/production.private.yaml \
+            --set images.backend.repository=$IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-backend \
+            --set images.backend.tag=${{ github.event.inputs.image_tag }} \
+            --set images.aiService.repository=$IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-ai-service \
+            --set images.aiService.tag=${{ github.event.inputs.image_tag }} \
+            --set images.frontend.repository=$IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-frontend \
+            --set images.frontend.tag=${{ github.event.inputs.image_tag }} \
+            --wait --timeout 20m
+
+      - name: Post-deploy smoke check
+        run: |
+          kubectl run smoke-prod-check -n ${{ github.event.inputs.namespace }} --rm -i --restart=Never \
+            --image=curlimages/curl --command -- sh -lc "
+              set -e
+              curl -sS -o /dev/null -w 'gateway=%{http_code}\n' http://$RELEASE_NAME-gateway/healthz
+              curl -sS -o /dev/null -w 'core=%{http_code}\n' http://$RELEASE_NAME-gateway/api/core/health/
+              curl -sS -o /dev/null -w 'ai=%{http_code}\n' http://$RELEASE_NAME-gateway/api/ai/health
+            "
