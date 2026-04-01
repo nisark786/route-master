@@ -78,45 +78,50 @@ jobs:
         with:
           version: v1.30.2
 
-      - name: Setup Helm
-        uses: azure/setup-helm@v4
-        with:
-          version: v3.15.4
+      - name: Setup Helm (Windows self-hosted)
+        shell: pwsh
+        run: |
+          choco install kubernetes-helm --version=3.15.4 -y
+          helm version
 
       - name: Configure kubeconfig
+        shell: pwsh
         run: |
-          mkdir -p ~/.kube
-          echo "${{ secrets.STAGING_KUBECONFIG_B64 }}" | base64 -d > ~/.kube/config
-          chmod 600 ~/.kube/config
+          $kubeDir = Join-Path $env:USERPROFILE ".kube"
+          New-Item -ItemType Directory -Force -Path $kubeDir | Out-Null
+          $kubeConfigPath = Join-Path $kubeDir "config"
+          [IO.File]::WriteAllBytes($kubeConfigPath, [Convert]::FromBase64String("${{ secrets.STAGING_KUBECONFIG_B64 }}"))
+          Write-Host "Kubeconfig written to $kubeConfigPath"
 
       - name: Write staging private values
+        shell: pwsh
         run: |
-          cat > /tmp/staging.private.yaml <<'EOF'
+          $privatePath = "C:\actions-runner\_work\_temp\staging.private.yaml"
+          @"
           ${{ secrets.STAGING_PRIVATE_VALUES_YAML }}
-          EOF
+          "@ | Out-File -FilePath $privatePath -Encoding utf8
+          Write-Host "Private values written to $privatePath"
 
       - name: Deploy with Helm
+        shell: pwsh
         run: |
-          helm upgrade --install $RELEASE_NAME infra/k8s/helm/route-management \
-            -n $NAMESPACE \
-            --create-namespace \
-            -f infra/k8s/helm/route-management/values.yaml \
-            -f infra/k8s/values/staging.yaml \
-            -f /tmp/staging.private.yaml \
-            --set images.backend.repository=$IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-backend \
-            --set images.backend.tag=${{ needs.build-images.outputs.image_tag }} \
-            --set images.aiService.repository=$IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-ai-service \
-            --set images.aiService.tag=${{ needs.build-images.outputs.image_tag }} \
-            --set images.frontend.repository=$IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-frontend \
-            --set images.frontend.tag=${{ needs.build-images.outputs.image_tag }} \
+          $privatePath = "C:\actions-runner\_work\_temp\staging.private.yaml"
+          helm upgrade --install $env:RELEASE_NAME infra/k8s/helm/route-management `
+            -n $env:NAMESPACE `
+            --create-namespace `
+            -f infra/k8s/helm/route-management/values.yaml `
+            -f infra/k8s/values/staging.yaml `
+            -f $privatePath `
+            --set images.backend.repository=$env:IMAGE_REGISTRY/$env:IMAGE_PREFIX/route-management-backend `
+            --set images.backend.tag=${{ needs.build-images.outputs.image_tag }} `
+            --set images.aiService.repository=$env:IMAGE_REGISTRY/$env:IMAGE_PREFIX/route-management-ai-service `
+            --set images.aiService.tag=${{ needs.build-images.outputs.image_tag }} `
+            --set images.frontend.repository=$env:IMAGE_REGISTRY/$env:IMAGE_PREFIX/route-management-frontend `
+            --set images.frontend.tag=${{ needs.build-images.outputs.image_tag }} `
             --wait --timeout 15m
 
       - name: Post-deploy smoke check
+        shell: pwsh
         run: |
-          kubectl run smoke-staging-check -n $NAMESPACE --rm -i --restart=Never \
-            --image=curlimages/curl --command -- sh -lc "
-              set -e
-              curl -sS -o /dev/null -w 'gateway=%{http_code}\n' http://$RELEASE_NAME-gateway/healthz
-              curl -sS -o /dev/null -w 'core=%{http_code}\n' http://$RELEASE_NAME-gateway/api/core/health/
-              curl -sS -o /dev/null -w 'ai=%{http_code}\n' http://$RELEASE_NAME-gateway/api/ai/health
-            "
+          kubectl run smoke-staging-check -n $env:NAMESPACE --rm -i --restart=Never `
+            --image=curlimages/curl --command -- sh -lc "set -e; curl -sS -o /dev/null -w 'gateway=%{http_code}\n' http://$env:RELEASE_NAME-gateway/healthz; curl -sS -o /dev/null -w 'core=%{http_code}\n' http://$env:RELEASE_NAME-gateway/api/core/health/; curl -sS -o /dev/null -w 'ai=%{http_code}\n' http://$env:RELEASE_NAME-gateway/api/ai/health"
