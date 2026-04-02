@@ -115,6 +115,12 @@ jobs:
             Write-Host "Namespace $env:NAMESPACE already exists"
           }
 
+      - name: Clean stale migration hook job
+        shell: powershell
+        run: |
+          $jobName = "$env:RELEASE_NAME-backend-migrate"
+          kubectl delete job $jobName -n $env:NAMESPACE --ignore-not-found=true
+
       - name: Deploy with Helm
         shell: powershell
         run: |
