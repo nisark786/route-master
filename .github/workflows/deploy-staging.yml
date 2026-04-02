@@ -125,6 +125,31 @@ jobs:
           $jobName = "$env:RELEASE_NAME-backend-migrate"
           kubectl delete job $jobName -n $env:NAMESPACE --ignore-not-found=true
 
+      - name: Pre-pull release images on self-hosted runner
+        shell: powershell
+        run: |
+          $images = @(
+            "$env:IMAGE_REGISTRY/$env:IMAGE_PREFIX/route-management-backend:${{ needs.build-images.outputs.image_tag }}",
+            "$env:IMAGE_REGISTRY/$env:IMAGE_PREFIX/route-management-ai-service:${{ needs.build-images.outputs.image_tag }}",
+            "$env:IMAGE_REGISTRY/$env:IMAGE_PREFIX/route-management-frontend:${{ needs.build-images.outputs.image_tag }}"
+          )
+
+          foreach ($image in $images) {
+            $ok = $false
+            for ($i = 1; $i -le 3; $i++) {
+              Write-Host "Pulling $image (attempt $i/3)"
+              docker pull $image
+              if ($LASTEXITCODE -eq 0) {
+                $ok = $true
+                break
+              }
+              Start-Sleep -Seconds (5 * $i)
+            }
+            if (-not $ok) {
+              throw "Failed to pre-pull image: $image"
+            }
+          }
+
       - name: Recover pending Helm release lock
         shell: powershell
         run: |
@@ -178,7 +203,7 @@ jobs:
             --set images.aiService.tag=${{ needs.build-images.outputs.image_tag }} `
             --set images.frontend.repository=$env:IMAGE_REGISTRY/$env:IMAGE_PREFIX/route-management-frontend `
             --set images.frontend.tag=${{ needs.build-images.outputs.image_tag }} `
-            --wait --timeout 15m
+            --wait --timeout 30m
 
       - name: Post-deploy smoke check
         shell: powershell
