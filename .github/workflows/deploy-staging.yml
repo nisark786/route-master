@@ -128,7 +128,14 @@ jobs:
       - name: Recover pending Helm release lock
         shell: powershell
         run: |
-          $statusJson = helm status $env:RELEASE_NAME -n $env:NAMESPACE -o json 2>$null
+          $statusJson = $null
+          try {
+            $statusJson = helm status $env:RELEASE_NAME -n $env:NAMESPACE -o json 2>$null
+          }
+          catch {
+            Write-Host "Release not found yet; continuing."
+            exit 0
+          }
           if (-not $statusJson) {
             Write-Host "No existing release status found; continuing."
             exit 0
