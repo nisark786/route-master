@@ -208,5 +208,45 @@ jobs:
       - name: Post-deploy smoke check
         shell: powershell
         run: |
-          kubectl run smoke-staging-check -n $env:NAMESPACE --rm -i --restart=Never `
-            --image=curlimages/curl --command -- sh -lc "set -e; curl -sS -o /dev/null -w 'gateway=%{http_code}\n' http://$env:RELEASE_NAME-gateway/healthz; curl -sS -o /dev/null -w 'core=%{http_code}\n' http://$env:RELEASE_NAME-gateway/api/core/health/; curl -sS -o /dev/null -w 'ai=%{http_code}\n' http://$env:RELEASE_NAME-gateway/api/ai/health"
+          $serviceName = "$env:RELEASE_NAME-gateway"
+          kubectl get svc $serviceName -n $env:NAMESPACE | Out-Null
+
+          $pf = Start-Process -FilePath "kubectl" `
+            -ArgumentList @("port-forward","-n",$env:NAMESPACE,"svc/$serviceName","18080:80") `
+            -PassThru -WindowStyle Hidden
+
+          function Test-Endpoint {
+            param(
+              [string]$Path,
+              [int]$MaxAttempts = 30
+            )
+
+            for ($i = 1; $i -le $MaxAttempts; $i++) {
+              try {
+                $resp = Invoke-WebRequest -Uri ("http://127.0.0.1:18080" + $Path) -Method Get -TimeoutSec 5
+                if ($resp.StatusCode -eq 200) {
+                  Write-Host "$Path => 200"
+                  return
+                }
+                Write-Host "$Path => $($resp.StatusCode) (attempt $i/$MaxAttempts)"
+              }
+              catch {
+                Write-Host "$Path => not ready (attempt $i/$MaxAttempts)"
+              }
+              Start-Sleep -Seconds 2
+            }
+
+            throw "Smoke check failed for path: $Path"
+          }
+
+          try {
+            Start-Sleep -Seconds 4
+            Test-Endpoint -Path "/healthz"
+            Test-Endpoint -Path "/api/core/health/"
+            Test-Endpoint -Path "/api/ai/health"
+          }
+          finally {
+            if ($pf -and -not $pf.HasExited) {
+              Stop-Process -Id $pf.Id -Force
+            }
+          }
