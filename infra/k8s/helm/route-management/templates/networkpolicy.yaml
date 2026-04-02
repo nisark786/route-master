@@ -95,6 +95,7 @@ spec:
           - celery-worker
           - ai-celery-worker
           - celery-beat
+          - migration-job
           - frontend
           - prometheus
           - grafana
