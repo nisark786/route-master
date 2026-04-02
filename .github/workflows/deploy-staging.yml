@@ -107,8 +107,9 @@ jobs:
       - name: Ensure staging namespace exists
         shell: powershell
         run: |
-          kubectl get namespace $env:NAMESPACE 2>$null
-          if ($LASTEXITCODE -ne 0) {
+          $existing = kubectl get namespace $env:NAMESPACE --ignore-not-found -o name
+          if ([string]::IsNullOrWhiteSpace($existing)) {
+            Write-Host "Namespace $env:NAMESPACE not found. Creating..."
             kubectl create namespace $env:NAMESPACE
           } else {
             Write-Host "Namespace $env:NAMESPACE already exists"
