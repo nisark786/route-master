@@ -1,5 +1,5 @@
 global:
-  createNamespace: true
+  createNamespace: false
   namespaceOverride: route-staging
 
 config:
