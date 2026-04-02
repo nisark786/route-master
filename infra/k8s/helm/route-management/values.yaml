@@ -246,6 +246,7 @@ aiCeleryWorker:
       memory: 1Gi
 
 celeryBeat:
+  enabled: true
   replicas: 1
   resources:
     requests:

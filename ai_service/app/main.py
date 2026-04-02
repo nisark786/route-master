@@ -1,3 +1,6 @@
+import logging
+import time
+
 from fastapi import FastAPI
 from prometheus_fastapi_instrumentator import Instrumentator
 from app.core.config import settings
@@ -11,10 +14,37 @@ app = FastAPI(
 )
 Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
+logger = logging.getLogger(__name__)
+
 
 @app.on_event("startup")
 def on_startup() -> None:
-    qdrant_store.ensure_collection()
+    # Qdrant can start slightly later than this service in Kubernetes.
+    # Retry a few times and keep the API process alive even if bootstrap fails,
+    # so the pod does not crash-loop during rollout.
+    max_attempts = 12
+    for attempt in range(1, max_attempts + 1):
+        try:
+            qdrant_store.ensure_collection()
+            logger.info("Qdrant bootstrap completed on attempt %s", attempt)
+            return
+        except Exception as exc:
+            if attempt == max_attempts:
+                logger.warning(
+                    "Qdrant bootstrap failed after %s attempts; service will continue and retry on demand. Error: %s",
+                    max_attempts,
+                    exc,
+                )
+                return
+            sleep_seconds = min(2 * attempt, 15)
+            logger.warning(
+                "Qdrant not ready (attempt %s/%s). Retrying in %ss. Error: %s",
+                attempt,
+                max_attempts,
+                sleep_seconds,
+                exc,
+            )
+            time.sleep(sleep_seconds)
 
 
 app.include_router(health_router)
