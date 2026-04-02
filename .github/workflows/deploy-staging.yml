@@ -84,14 +84,16 @@ jobs:
           choco install kubernetes-helm --version=3.15.4 -y
           helm version
 
-      - name: Configure kubeconfig
+      - name: Use local kubeconfig (self-hosted)
         shell: powershell
         run: |
-          $kubeDir = Join-Path $env:USERPROFILE ".kube"
-          New-Item -ItemType Directory -Force -Path $kubeDir | Out-Null
-          $kubeConfigPath = Join-Path $kubeDir "config"
-          [IO.File]::WriteAllBytes($kubeConfigPath, [Convert]::FromBase64String("${{ secrets.STAGING_KUBECONFIG_B64 }}"))
-          Write-Host "Kubeconfig written to $kubeConfigPath"
+          $kubeConfigPath = Join-Path $env:USERPROFILE ".kube\config"
+          if (-not (Test-Path $kubeConfigPath)) {
+            throw "Local kubeconfig not found at $kubeConfigPath"
+          }
+          $env:KUBECONFIG = $kubeConfigPath
+          Write-Host "Using local kubeconfig at $kubeConfigPath"
+          kubectl cluster-info
 
       - name: Write staging private values
         shell: powershell
