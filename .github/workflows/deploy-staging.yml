@@ -11,6 +11,10 @@ on:
       - "infra/k8s/**"
       - ".github/workflows/deploy-staging.yml"
 
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: true
+
 permissions:
   contents: read
   packages: write
@@ -120,6 +124,37 @@ jobs:
         run: |
           $jobName = "$env:RELEASE_NAME-backend-migrate"
           kubectl delete job $jobName -n $env:NAMESPACE --ignore-not-found=true
+
+      - name: Recover pending Helm release lock
+        shell: powershell
+        run: |
+          $statusJson = helm status $env:RELEASE_NAME -n $env:NAMESPACE -o json 2>$null
+          if (-not $statusJson) {
+            Write-Host "No existing release status found; continuing."
+            exit 0
+          }
+
+          $statusObj = $statusJson | ConvertFrom-Json
+          $currentStatus = [string]$statusObj.info.status
+          Write-Host "Current Helm release status: $currentStatus"
+
+          if (-not $currentStatus.StartsWith("pending-")) {
+            Write-Host "Release is not pending; continuing."
+            exit 0
+          }
+
+          $historyJson = helm history $env:RELEASE_NAME -n $env:NAMESPACE -o json
+          $history = $historyJson | ConvertFrom-Json
+          $lastDeployed = $history | Where-Object { $_.status -eq "deployed" } | Select-Object -Last 1
+
+          if ($null -ne $lastDeployed) {
+            Write-Host "Pending lock detected. Rolling back to revision $($lastDeployed.revision)"
+            helm rollback $env:RELEASE_NAME $lastDeployed.revision -n $env:NAMESPACE --wait --timeout 10m
+          }
+          else {
+            Write-Host "Pending lock detected with no deployed revision. Uninstalling release to recover."
+            helm uninstall $env:RELEASE_NAME -n $env:NAMESPACE
+          }
 
       - name: Deploy with Helm
         shell: powershell
