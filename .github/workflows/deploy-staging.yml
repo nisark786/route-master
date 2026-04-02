@@ -2,6 +2,12 @@ name: Deploy Staging
 
 on:
   workflow_dispatch:
+    inputs:
+      skip_build:
+        description: "Skip image build/push and deploy using staging-latest tags"
+        required: false
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths:
@@ -26,8 +32,24 @@ env:
   NAMESPACE: route-staging
 
 jobs:
-  build-images:
+  resolve-image-tag:
     runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.out.outputs.image_tag }}
+    steps:
+      - name: Resolve deploy image tag
+        id: out
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.skip_build }}" == "true" ]]; then
+            echo "image_tag=staging-latest" >> "$GITHUB_OUTPUT"
+          else
+            echo "image_tag=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-images:
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_build) }}
+    runs-on: ubuntu-latest
+    needs: resolve-image-tag
     outputs:
       image_tag: ${{ steps.vars.outputs.image_tag }}
     steps:
@@ -37,7 +59,7 @@ jobs:
       - name: Set Vars
         id: vars
         run: |
-          echo "image_tag=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${{ needs.resolve-image-tag.outputs.image_tag }}" >> "$GITHUB_OUTPUT"
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -49,29 +71,35 @@ jobs:
       - name: Build + Push Backend
         run: |
           docker build -f core_services/Dockerfile.prod \
-            -t $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-backend:${GITHUB_SHA} \
+            -t $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-backend:${{ needs.resolve-image-tag.outputs.image_tag }} \
+            -t $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-backend:staging-latest \
             core_services
-          docker push $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-backend:${GITHUB_SHA}
+          docker push $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-backend:${{ needs.resolve-image-tag.outputs.image_tag }}
+          docker push $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-backend:staging-latest
 
       - name: Build + Push AI Service
         run: |
           docker build -f ai_service/Dockerfile.prod \
-            -t $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-ai-service:${GITHUB_SHA} \
+            -t $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-ai-service:${{ needs.resolve-image-tag.outputs.image_tag }} \
+            -t $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-ai-service:staging-latest \
             ai_service
-          docker push $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-ai-service:${GITHUB_SHA}
+          docker push $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-ai-service:${{ needs.resolve-image-tag.outputs.image_tag }}
+          docker push $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-ai-service:staging-latest
 
       - name: Build + Push Frontend
         run: |
           docker build -f frontend/route_management/Dockerfile.prod \
-            -t $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-frontend:${GITHUB_SHA} \
+            -t $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-frontend:${{ needs.resolve-image-tag.outputs.image_tag }} \
+            -t $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-frontend:staging-latest \
             frontend/route_management
-          docker push $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-frontend:${GITHUB_SHA}
+          docker push $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-frontend:${{ needs.resolve-image-tag.outputs.image_tag }}
+          docker push $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-frontend:staging-latest
 
   deploy:
     # Local Docker Desktop Kubernetes is only reachable from a self-hosted runner
     # running on the same machine/network.
     runs-on: self-hosted
-    needs: build-images
+    needs: [resolve-image-tag, build-images]
     environment: staging
     steps:
       - name: Checkout
@@ -129,9 +157,9 @@ jobs:
         shell: powershell
         run: |
           $images = @(
-            "$env:IMAGE_REGISTRY/$env:IMAGE_PREFIX/route-management-backend:${{ needs.build-images.outputs.image_tag }}",
-            "$env:IMAGE_REGISTRY/$env:IMAGE_PREFIX/route-management-ai-service:${{ needs.build-images.outputs.image_tag }}",
-            "$env:IMAGE_REGISTRY/$env:IMAGE_PREFIX/route-management-frontend:${{ needs.build-images.outputs.image_tag }}"
+            "$env:IMAGE_REGISTRY/$env:IMAGE_PREFIX/route-management-backend:${{ needs.resolve-image-tag.outputs.image_tag }}",
+            "$env:IMAGE_REGISTRY/$env:IMAGE_PREFIX/route-management-ai-service:${{ needs.resolve-image-tag.outputs.image_tag }}",
+            "$env:IMAGE_REGISTRY/$env:IMAGE_PREFIX/route-management-frontend:${{ needs.resolve-image-tag.outputs.image_tag }}"
           )
 
           foreach ($image in $images) {
@@ -198,11 +226,11 @@ jobs:
             -f infra/k8s/values/staging.yaml `
             -f $privatePath `
             --set images.backend.repository=$env:IMAGE_REGISTRY/$env:IMAGE_PREFIX/route-management-backend `
-            --set images.backend.tag=${{ needs.build-images.outputs.image_tag }} `
+            --set images.backend.tag=${{ needs.resolve-image-tag.outputs.image_tag }} `
             --set images.aiService.repository=$env:IMAGE_REGISTRY/$env:IMAGE_PREFIX/route-management-ai-service `
-            --set images.aiService.tag=${{ needs.build-images.outputs.image_tag }} `
+            --set images.aiService.tag=${{ needs.resolve-image-tag.outputs.image_tag }} `
             --set images.frontend.repository=$env:IMAGE_REGISTRY/$env:IMAGE_PREFIX/route-management-frontend `
-            --set images.frontend.tag=${{ needs.build-images.outputs.image_tag }} `
+            --set images.frontend.tag=${{ needs.resolve-image-tag.outputs.image_tag }} `
             --wait --timeout 30m
 
       - name: Post-deploy smoke check
