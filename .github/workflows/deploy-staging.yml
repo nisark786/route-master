@@ -104,6 +104,16 @@ jobs:
           "@ | Out-File -FilePath $privatePath -Encoding utf8
           Write-Host "Private values written to $privatePath"
 
+      - name: Ensure staging namespace exists
+        shell: powershell
+        run: |
+          kubectl get namespace $env:NAMESPACE 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            kubectl create namespace $env:NAMESPACE
+          } else {
+            Write-Host "Namespace $env:NAMESPACE already exists"
+          }
+
       - name: Deploy with Helm
         shell: powershell
         run: |
