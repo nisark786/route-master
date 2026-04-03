@@ -1,4 +1,5 @@
 import { fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import { getRuntimeConfig } from "../../config/runtimeConfig";
 
 import { clearSubscriptionGate, logout, setCredentials, setSubscriptionGate } from "./authSlice";
 
@@ -17,12 +18,27 @@ const buildBaseQuery = (baseUrl) =>
     },
   });
 
+const API_ROOT = (() => {
+  const configured = getRuntimeConfig("VITE_API_URL", import.meta.env.VITE_API_URL || "/api/");
+  return configured.endsWith("/") ? configured.slice(0, -1) : configured;
+})();
+
+function resolveBaseUrl(baseUrl) {
+  if (baseUrl.startsWith("/api/")) {
+    return `${API_ROOT}${baseUrl.slice(4)}`;
+  }
+  if (baseUrl.startsWith("/")) {
+    return `${API_ROOT}${baseUrl}`;
+  }
+  return baseUrl;
+}
+
 export function createAuthBaseQuery(baseUrl) {
-  const authBaseQuery = buildBaseQuery("/api/core/");
+  const authBaseQuery = buildBaseQuery(resolveBaseUrl("/api/core/"));
 
   return async (args, api, extraOptions) => {
     const baseUrlOverride = typeof args === "object" && args !== null ? args.baseUrlOverride : undefined;
-    const effectiveBaseQuery = buildBaseQuery(baseUrlOverride || baseUrl);
+    const effectiveBaseQuery = buildBaseQuery(resolveBaseUrl(baseUrlOverride || baseUrl));
     const sanitizedArgs =
       typeof args === "object" && args !== null
         ? Object.fromEntries(Object.entries(args).filter(([key]) => key !== "baseUrlOverride"))
