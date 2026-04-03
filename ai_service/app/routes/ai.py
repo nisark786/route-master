@@ -204,6 +204,7 @@ async def dispatch_copilot(
     try:
         return dispatch_copilot_service.suggest(tenant_id=tenant_id, payload=payload)
     except Exception as exc:
+        logger.exception("dispatch_copilot_failed tenant=%s", tenant_id)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Dispatch copilot failed: {exc}",
@@ -224,6 +225,7 @@ async def approve_dispatch_copilot(
             detail=str(exc),
         ) from exc
     except Exception as exc:
+        logger.exception("dispatch_copilot_approve_failed tenant=%s plan_id=%s", tenant_id, payload.plan_id)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Dispatch approval failed: {exc}",
