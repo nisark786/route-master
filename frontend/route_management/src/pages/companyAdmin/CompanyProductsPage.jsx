@@ -96,7 +96,7 @@ export default function CompanyProductsPage() {
   const [draft, setDraft] = useState(createInitialDraft);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [editDraft, setEditDraft] = useState(INITIAL_DRAFT);
+  const [editDraft, setEditDraft] = useState(createInitialDraft);
   const [editExistingImageUrl, setEditExistingImageUrl] = useState("");
   const [confirmAction, setConfirmAction] = useState(null);
 
