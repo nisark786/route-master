@@ -23,12 +23,23 @@ const API_ROOT = (() => {
   return configured.endsWith("/") ? configured.slice(0, -1) : configured;
 })();
 
+const API_ORIGIN = (() => {
+  try {
+    return new URL(API_ROOT, window.location.origin).origin;
+  } catch {
+    return "";
+  }
+})();
+
 function resolveBaseUrl(baseUrl) {
+  if (baseUrl === "/") {
+    return API_ORIGIN ? `${API_ORIGIN}/` : "/";
+  }
   if (baseUrl.startsWith("/api/")) {
     return `${API_ROOT}${baseUrl.slice(4)}`;
   }
   if (baseUrl.startsWith("/")) {
-    return `${API_ROOT}${baseUrl}`;
+    return API_ORIGIN ? `${API_ORIGIN}${baseUrl}` : `${API_ROOT}${baseUrl}`;
   }
   return baseUrl;
 }
