@@ -12,6 +12,11 @@ Current scope:
   - `media/shops/`
 - Optional CloudFront + OAC for media reads
 - Optional CloudFront read bucket policy
+- Optional managed data layer for EKS offload:
+  - RDS PostgreSQL (single instance)
+  - Amazon DocumentDB
+  - Amazon MQ (RabbitMQ)
+  - Secrets Manager connection bundle
 
 ## Why this is staged
 
@@ -126,3 +131,27 @@ After this stack is stable, we can migrate the rest in phases:
 4. IAM roles for service accounts
 5. Route53 + ACM + ingress DNS
 6. Monitoring stack add-ons
+
+## Managed data layer (hybrid AWS) quick start
+
+1. Set in `terraform.tfvars`:
+
+```hcl
+enable_managed_data_layer = true
+eks_cluster_name          = "route-master-prod"
+```
+
+2. (Optional) set `managed_data_subnet_ids` if you do not want to use EKS subnets.
+3. Run:
+
+```powershell
+terraform init
+terraform plan
+terraform apply
+```
+
+4. Capture outputs and wire Helm private values:
+   - `rds_endpoint`, `rds_port`, `rds_core_db_name`, `rds_ai_db_name`
+   - `documentdb_endpoint`, `documentdb_port`
+   - `amazon_mq_endpoint`
+5. Use cutover runbook to migrate data and switch app endpoints.

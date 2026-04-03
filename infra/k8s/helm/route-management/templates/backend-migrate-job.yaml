@@ -24,7 +24,7 @@ spec:
             - /bin/sh
             - -c
             - >
-              until nc -z {{ include "route-management.fullname" . }}-postgres-core {{ .Values.postgresCore.service.port }};
+              until nc -z {{ ternary .Values.externalServices.postgresCore.host (printf "%s-postgres-core" (include "route-management.fullname" .)) .Values.externalServices.postgresCore.enabled }} {{ ternary (.Values.externalServices.postgresCore.port | toString) (.Values.postgresCore.service.port | toString) .Values.externalServices.postgresCore.enabled }};
               do echo "waiting for postgres"; sleep 2; done
       containers:
         - name: backend-migrate

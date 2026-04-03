@@ -1,5 +1,6 @@
 aws_region            = "ap-south-1"
 bucket_name           = "nisar-route-master-123"
+enable_image_optimizer_stack = true
 lambda_function_name  = "route-management-image-optimizer"
 lambda_role_name      = "route-management-image-optimizer-role"
 lambda_package_path   = "../lambda/image_optimizer/build/image-optimizer.zip"
@@ -12,3 +13,35 @@ enable_cloudfront              = false
 manage_cloudfront_bucket_policy = false
 cloudfront_price_class         = "PriceClass_200"
 cloudfront_comment             = "RouteMaster media CDN"
+
+# Managed data layer offload (EKS -> AWS managed services)
+enable_managed_data_layer = false
+eks_cluster_name          = "route-master-prod"
+
+# Optional; keep empty to use EKS cluster subnets
+managed_data_subnet_ids = []
+
+rds_identifier       = "route-management-postgres"
+rds_instance_class   = "db.t3.micro"
+rds_engine_version   = "16.4"
+rds_allocated_storage = 20
+rds_max_allocated_storage = 100
+rds_port             = 5432
+rds_core_db_name     = "route_core_db"
+rds_ai_db_name       = "route_ai_db"
+rds_master_username  = "route_admin"
+rds_master_password  = ""
+
+docdb_cluster_identifier = "route-management-docdb"
+docdb_instance_class     = "db.t3.medium"
+docdb_instance_count     = 1
+docdb_engine_version     = "5.0.0"
+docdb_master_username    = "route_docdb_admin"
+docdb_master_password    = ""
+docdb_port               = 27017
+
+mq_broker_name      = "route-management-rabbitmq"
+mq_engine_version   = "3.13"
+mq_instance_type    = "mq.t3.micro"
+mq_username         = "route_user_prod"
+mq_password         = ""

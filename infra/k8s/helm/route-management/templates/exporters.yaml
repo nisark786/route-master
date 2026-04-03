@@ -1,4 +1,5 @@
 {{- if .Values.exporters.enabled }}
+{{- if and (default true .Values.redis.enabled) (not .Values.externalServices.redis.enabled) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -43,6 +44,8 @@ spec:
       port: 9121
       targetPort: http
 ---
+{{- end }}
+{{- if and .Values.rabbitmq.enabled (not .Values.externalServices.rabbitmq.enabled) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -101,6 +104,8 @@ spec:
       port: 9419
       targetPort: http
 ---
+{{- end }}
+{{- if and .Values.postgresCore.enabled (not .Values.externalServices.postgresCore.enabled) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -154,6 +159,8 @@ spec:
       port: 9187
       targetPort: http
 ---
+{{- end }}
+{{- if and .Values.postgresAi.enabled (not .Values.externalServices.postgresAi.enabled) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -207,6 +214,8 @@ spec:
       port: 9187
       targetPort: http
 ---
+{{- end }}
+{{- if and .Values.mongo.enabled (not .Values.externalServices.mongo.enabled) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -250,5 +259,6 @@ spec:
     - name: http
       port: 9216
       targetPort: http
+{{- end }}
 {{- end }}
 ---

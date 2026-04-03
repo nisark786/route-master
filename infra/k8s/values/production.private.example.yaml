@@ -1,7 +1,42 @@
+externalServices:
+  postgresCore:
+    enabled: true
+    host: "replace-with-rds-endpoint"
+    port: 5432
+  postgresAi:
+    enabled: true
+    host: "replace-with-rds-endpoint"
+    port: 5432
+  rabbitmq:
+    enabled: true
+    brokerUrl: "amqps://replace-with-amazonmq-user:replace-with-amazonmq-password@replace-with-amazonmq-endpoint/vhost"
+  mongo:
+    enabled: true
+    uri: "mongodb://replace-with-docdb-user:replace-with-docdb-password@replace-with-docdb-endpoint:27017/?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false"
+  qdrant:
+    enabled: true
+    url: "https://replace-with-qdrant-cloud-endpoint:6333"
+  redis:
+    enabled: true
+    url: "redis://replace-with-elasticache-endpoint:6379/2"
+
+postgresCore:
+  enabled: false
+postgresAi:
+  enabled: false
+rabbitmq:
+  enabled: false
+mongo:
+  enabled: false
+qdrant:
+  enabled: false
+redis:
+  enabled: false
+
 secrets:
   core:
     SECRET_KEY: "replace-with-strong-django-secret"
-    DB_PASSWORD: "replace-with-core-db-password"
+    DB_PASSWORD: "replace-with-rds-master-or-app-db-password"
     RAZORPAY_KEY_ID: "replace-with-live-key-id"
     RAZORPAY_KEY_SECRET: "replace-with-live-key-secret"
     EMAIL_HOST_USER: "replace-with-smtp-user"
@@ -18,7 +53,7 @@ secrets:
     OPENAI_API_KEY: ""
     HUGGINGFACE_API_KEY: "replace-with-hf-key-or-keep-empty-if-not-used"
     QDRANT_API_KEY: ""
-    AI_DB_PASSWORD: "replace-with-ai-db-password"
+    AI_DB_PASSWORD: "replace-with-rds-master-or-app-db-password"
     AUTH_JWT_SECRET: "replace-with-ai-jwt-secret"
     AUTH_INTERNAL_TOKEN_SECRET: "replace-with-ai-internal-secret"
   rabbitmq:

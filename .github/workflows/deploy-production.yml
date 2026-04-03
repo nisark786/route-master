@@ -13,6 +13,10 @@ on:
         default: "route-prod"
         type: string
 
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
@@ -44,6 +48,36 @@ jobs:
           mkdir -p ~/.kube
           echo "${{ secrets.PROD_KUBECONFIG_B64 }}" | base64 -d > ~/.kube/config
           chmod 600 ~/.kube/config
+
+      - name: Pre-deploy auth/addon/secret checks
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace("${{ secrets.PROD_PRIVATE_VALUES_YAML }}")) {
+            throw "PROD_PRIVATE_VALUES_YAML secret is empty."
+          }
+
+          if ("${{ secrets.PROD_PRIVATE_VALUES_YAML }}".Contains("__REQUIRED__")) {
+            throw "PROD_PRIVATE_VALUES_YAML still contains __REQUIRED__ placeholders."
+          }
+
+          kubectl auth can-i get pods -n "${{ github.event.inputs.namespace }}" | Out-Null
+
+          $currentContext = kubectl config current-context
+          if (($currentContext -like "arn:aws:eks:*") -and (Get-Command aws -ErrorAction SilentlyContinue)) {
+            try {
+              aws sts get-caller-identity | Out-Null
+              $parts = $currentContext.Split(":")
+              $region = $parts[3]
+              $clusterName = $parts[$parts.Length - 1].Split("/")[1]
+              $addons = aws eks list-addons --cluster-name $clusterName --region $region | ConvertFrom-Json
+              if (-not ($addons.addons -contains "aws-ebs-csi-driver")) {
+                throw "EKS addon aws-ebs-csi-driver is missing. Install it before deploy."
+              }
+            }
+            catch {
+              Write-Warning "Skipping EKS addon check because AWS CLI auth was not available in this runner context."
+            }
+          }
 
       - name: Write production private values
         run: |

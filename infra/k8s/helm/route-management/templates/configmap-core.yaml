@@ -10,15 +10,16 @@ data:
   ALLOWED_HOSTS: {{ .Values.config.core.ALLOWED_HOSTS | quote }}
   CORS_ALLOWED_ORIGINS: {{ .Values.config.core.CORS_ALLOWED_ORIGINS | quote }}
   DB_ENGINE: {{ .Values.config.core.DB_ENGINE | quote }}
-  DB_HOST: {{ printf "%s-postgres-core" (include "route-management.fullname" .) | quote }}
-  DB_PORT: {{ .Values.config.core.DB_PORT | quote }}
+  DB_HOST: {{ ternary .Values.externalServices.postgresCore.host (printf "%s-postgres-core" (include "route-management.fullname" .)) .Values.externalServices.postgresCore.enabled | quote }}
+  DB_PORT: {{ ternary (.Values.externalServices.postgresCore.port | toString) .Values.config.core.DB_PORT .Values.externalServices.postgresCore.enabled | quote }}
   DB_NAME: {{ .Values.config.core.DB_NAME | quote }}
   DB_USER: {{ .Values.config.core.DB_USER | quote }}
-  REDIS_URL: {{ printf "redis://%s-redis:%v/1" (include "route-management.fullname" .) .Values.redis.service.port | quote }}
+  DB_SSLMODE: {{ .Values.config.core.DB_SSLMODE | quote }}
+  REDIS_URL: {{ ternary .Values.externalServices.redis.url (printf "redis://%s-redis:%v/1" (include "route-management.fullname" .) .Values.redis.service.port) .Values.externalServices.redis.enabled | quote }}
   USE_REDIS_CACHE: {{ .Values.config.core.USE_REDIS_CACHE | quote }}
-  CELERY_BROKER_URL: {{ printf "amqp://%s:%s@%s-rabbitmq:%s/%s" .Values.secrets.rabbitmq.username .Values.secrets.rabbitmq.password (include "route-management.fullname" .) (.Values.rabbitmq.service.amqpPort | toString) .Values.secrets.rabbitmq.vhost | quote }}
-  CELERY_RESULT_BACKEND: {{ printf "redis://%s-redis:%v/1" (include "route-management.fullname" .) .Values.redis.service.port | quote }}
-  MONGO_URI: {{ printf "mongodb://%s-mongo:%v" (include "route-management.fullname" .) .Values.mongo.service.port | quote }}
+  CELERY_BROKER_URL: {{ ternary .Values.externalServices.rabbitmq.brokerUrl (printf "amqp://%s:%s@%s-rabbitmq:%s/%s" .Values.secrets.rabbitmq.username .Values.secrets.rabbitmq.password (include "route-management.fullname" .) (.Values.rabbitmq.service.amqpPort | toString) .Values.secrets.rabbitmq.vhost) .Values.externalServices.rabbitmq.enabled | quote }}
+  CELERY_RESULT_BACKEND: {{ default (ternary .Values.externalServices.redis.url (printf "redis://%s-redis:%v/1" (include "route-management.fullname" .) .Values.redis.service.port) .Values.externalServices.redis.enabled) .Values.config.core.CELERY_RESULT_BACKEND | quote }}
+  MONGO_URI: {{ ternary .Values.externalServices.mongo.uri (printf "mongodb://%s-mongo:%v" (include "route-management.fullname" .) .Values.mongo.service.port) .Values.externalServices.mongo.enabled | quote }}
   MONGO_DB_NAME: {{ .Values.config.core.MONGO_DB_NAME | quote }}
   MONGO_LOCATIONS_COLLECTION: {{ .Values.config.core.MONGO_LOCATIONS_COLLECTION | quote }}
   SEND_OTP_ASYNC: {{ .Values.config.core.SEND_OTP_ASYNC | quote }}

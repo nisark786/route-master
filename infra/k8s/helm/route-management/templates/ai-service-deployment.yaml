@@ -8,6 +8,11 @@ metadata:
     app.kubernetes.io/component: ai-service
 spec:
   replicas: {{ .Values.aiService.replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 0
   selector:
     matchLabels:
       {{- include "route-management.selectorLabels" . | nindent 6 }}
@@ -23,6 +28,16 @@ spec:
         - name: ai-service
           image: "{{ .Values.images.aiService.repository }}:{{ .Values.images.aiService.tag }}"
           imagePullPolicy: {{ .Values.images.aiService.pullPolicy }}
+          command:
+            - uvicorn
+          args:
+            - app.main:app
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8001"
+            - --workers
+            - "2"
           ports:
             - containerPort: {{ .Values.aiService.service.port }}
               name: http
@@ -35,23 +50,25 @@ spec:
             httpGet:
               path: /health
               port: http
-            timeoutSeconds: 5
-            failureThreshold: 30
-            periodSeconds: 10
+            timeoutSeconds: 30
+            failureThreshold: 60
+            periodSeconds: 15
           readinessProbe:
             httpGet:
               path: /health
               port: http
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            timeoutSeconds: 5
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            timeoutSeconds: 30
+            failureThreshold: 10
           livenessProbe:
             httpGet:
               path: /health
               port: http
-            initialDelaySeconds: 30
-            periodSeconds: 20
-            timeoutSeconds: 5
+            initialDelaySeconds: 180
+            periodSeconds: 30
+            timeoutSeconds: 30
+            failureThreshold: 6
           resources:
             {{- toYaml .Values.aiService.resources | nindent 12 }}
 ---

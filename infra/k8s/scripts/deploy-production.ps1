@@ -66,6 +66,6 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Running post-deploy smoke checks..."
-kubectl run smoke-prod-check -n $Namespace --rm -i --restart=Never --image=curlimages/curl --command -- sh -lc "set -e; echo gateway_healthz; curl -sS -o /dev/null -w '%{http_code}\n' http://$ReleaseName-gateway/healthz; echo core_health; curl -sS -o /dev/null -w '%{http_code}\n' http://$ReleaseName-gateway/api/core/health/; echo ai_health; curl -sS -o /dev/null -w '%{http_code}\n' http://$ReleaseName-gateway/api/ai/health; echo root; curl -sS -o /dev/null -w '%{http_code}\n' http://$ReleaseName-gateway/;"
+kubectl run smoke-prod-check -n $Namespace --rm -i --restart=Never --image=curlimages/curl --command -- sh -lc "set -e; echo gateway_healthz; curl -sS -o /dev/null -w '%{http_code}\n' http://$ReleaseName-gateway/healthz; echo core_health; curl -sS -o /dev/null -w '%{http_code}\n' http://$ReleaseName-gateway/api/core/health/; echo ai_auth_guard; curl -sS -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/json' -d '{}' http://$ReleaseName-gateway/api/ai/chat; echo root; curl -sS -o /dev/null -w '%{http_code}\n' http://$ReleaseName-gateway/;"
 
 Write-Host "Deployment completed." -ForegroundColor Green

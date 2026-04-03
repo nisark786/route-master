@@ -41,7 +41,7 @@ spec:
               port: http
               httpHeaders:
                 - name: Host
-                  value: localhost
+                  value: {{ .Values.backend.probes.hostHeader | quote }}
             timeoutSeconds: 5
             failureThreshold: 30
             periodSeconds: 10
@@ -51,7 +51,7 @@ spec:
               port: http
               httpHeaders:
                 - name: Host
-                  value: localhost
+                  value: {{ .Values.backend.probes.hostHeader | quote }}
             initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 5
@@ -61,7 +61,7 @@ spec:
               port: http
               httpHeaders:
                 - name: Host
-                  value: localhost
+                  value: {{ .Values.backend.probes.hostHeader | quote }}
             initialDelaySeconds: 30
             periodSeconds: 20
             timeoutSeconds: 5

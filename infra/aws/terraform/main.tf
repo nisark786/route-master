@@ -6,7 +6,7 @@ data "aws_s3_bucket" "media" {
 
 data "aws_iam_policy_document" "lambda_assume_role" {
   statement {
-    effect = "Allow"
+    effect  = "Allow"
     actions = ["sts:AssumeRole"]
 
     principals {
@@ -17,6 +17,7 @@ data "aws_iam_policy_document" "lambda_assume_role" {
 }
 
 resource "aws_iam_role" "image_optimizer" {
+  count              = var.enable_image_optimizer_stack ? 1 : 0
   name               = var.lambda_role_name
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
 }
@@ -49,14 +50,16 @@ data "aws_iam_policy_document" "image_optimizer_inline" {
 }
 
 resource "aws_iam_role_policy" "image_optimizer_inline" {
+  count  = var.enable_image_optimizer_stack ? 1 : 0
   name   = "${var.lambda_function_name}-inline"
-  role   = aws_iam_role.image_optimizer.id
+  role   = aws_iam_role.image_optimizer[0].id
   policy = data.aws_iam_policy_document.image_optimizer_inline.json
 }
 
 resource "aws_lambda_function" "image_optimizer" {
+  count         = var.enable_image_optimizer_stack ? 1 : 0
   function_name = var.lambda_function_name
-  role          = aws_iam_role.image_optimizer.arn
+  role          = aws_iam_role.image_optimizer[0].arn
   runtime       = var.lambda_runtime
   handler       = var.lambda_handler
   timeout       = var.lambda_timeout
@@ -75,37 +78,38 @@ resource "aws_lambda_function" "image_optimizer" {
     }
   }
 
-  depends_on = [aws_iam_role_policy.image_optimizer_inline]
+  depends_on = [aws_iam_role_policy.image_optimizer_inline[0]]
 }
 
 resource "aws_lambda_permission" "allow_s3_invoke" {
+  count          = var.enable_image_optimizer_stack ? 1 : 0
   statement_id   = "AllowExecutionFromS3Bucket"
   action         = "lambda:InvokeFunction"
-  function_name  = aws_lambda_function.image_optimizer.function_name
+  function_name  = aws_lambda_function.image_optimizer[0].function_name
   principal      = "s3.amazonaws.com"
   source_arn     = data.aws_s3_bucket.media.arn
   source_account = data.aws_caller_identity.current.account_id
 }
 
 resource "aws_s3_bucket_notification" "media_image_optimizer" {
-  count  = var.manage_bucket_notifications ? 1 : 0
+  count  = var.manage_bucket_notifications && var.enable_image_optimizer_stack ? 1 : 0
   bucket = data.aws_s3_bucket.media.id
 
   lambda_function {
     id                  = "route-management-products-image-optimizer"
-    lambda_function_arn = aws_lambda_function.image_optimizer.arn
+    lambda_function_arn = aws_lambda_function.image_optimizer[0].arn
     events              = ["s3:ObjectCreated:*"]
     filter_prefix       = "media/products/"
   }
 
   lambda_function {
     id                  = "route-management-shops-image-optimizer"
-    lambda_function_arn = aws_lambda_function.image_optimizer.arn
+    lambda_function_arn = aws_lambda_function.image_optimizer[0].arn
     events              = ["s3:ObjectCreated:*"]
     filter_prefix       = "media/shops/"
   }
 
-  depends_on = [aws_lambda_permission.allow_s3_invoke]
+  depends_on = [aws_lambda_permission.allow_s3_invoke[0]]
 }
 
 resource "aws_cloudfront_origin_access_control" "media" {

@@ -77,6 +77,55 @@
     "rabbitmq": { "$ref": "#/$defs/rabbitmqWorkload" },
     "mongo": { "$ref": "#/$defs/statefulWorkload" },
     "qdrant": { "$ref": "#/$defs/qdrantWorkload" },
+    "externalServices": {
+      "type": "object",
+      "properties": {
+        "postgresCore": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "host": { "type": "string" },
+            "port": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "postgresAi": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "host": { "type": "string" },
+            "port": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "rabbitmq": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "brokerUrl": { "type": "string" }
+          }
+        },
+        "mongo": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "uri": { "type": "string" }
+          }
+        },
+        "qdrant": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "url": { "type": "string" }
+          }
+        },
+        "redis": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "url": { "type": "string" }
+          }
+        }
+      }
+    },
     "prometheus": {
       "type": "object",
       "properties": {
@@ -133,7 +182,8 @@
     "scalableWorkload": {
       "type": "object",
       "properties": {
-        "replicas": { "type": "integer", "minimum": 1 },
+        "enabled": { "type": "boolean" },
+        "replicas": { "type": "integer", "minimum": 0 },
         "service": { "$ref": "#/$defs/service" },
         "resources": { "$ref": "#/$defs/resources" },
         "autoscaling": { "$ref": "#/$defs/autoscaling" },
@@ -143,14 +193,16 @@
     "workerWorkload": {
       "type": "object",
       "properties": {
-        "replicas": { "type": "integer", "minimum": 1 },
+        "enabled": { "type": "boolean" },
+        "replicas": { "type": "integer", "minimum": 0 },
         "resources": { "$ref": "#/$defs/resources" }
       }
     },
     "statefulWorkload": {
       "type": "object",
       "properties": {
-        "replicas": { "type": "integer", "minimum": 1 },
+        "enabled": { "type": "boolean" },
+        "replicas": { "type": "integer", "minimum": 0 },
         "service": { "$ref": "#/$defs/service" },
         "persistence": { "$ref": "#/$defs/persistence" },
         "resources": { "$ref": "#/$defs/resources" }
@@ -159,7 +211,8 @@
     "rabbitmqWorkload": {
       "type": "object",
       "properties": {
-        "replicas": { "type": "integer", "minimum": 1 },
+        "enabled": { "type": "boolean" },
+        "replicas": { "type": "integer", "minimum": 0 },
         "service": {
           "type": "object",
           "properties": {
@@ -174,7 +227,8 @@
     "qdrantWorkload": {
       "type": "object",
       "properties": {
-        "replicas": { "type": "integer", "minimum": 1 },
+        "enabled": { "type": "boolean" },
+        "replicas": { "type": "integer", "minimum": 0 },
         "service": {
           "type": "object",
           "properties": {

@@ -38,6 +38,7 @@ config:
     DB_PORT: "5432"
     DB_NAME: "route_db"
     DB_USER: "postgres"
+    DB_SSLMODE: "prefer"
     USE_REDIS_CACHE: "True"
     MONGO_DB_NAME: "route_tracking"
     MONGO_LOCATIONS_COLLECTION: "driver_locations"
@@ -48,6 +49,7 @@ config:
     EMAIL_USE_TLS: "True"
     AI_AUTOSYNC_ENABLED: "True"
     AI_AUTOSYNC_INTERVAL_MINUTES: "15"
+    CELERY_RESULT_BACKEND: ""
     USE_S3_MEDIA: "False"
     AWS_S3_MEDIA_PREFIX: "media"
     AWS_QUERYSTRING_AUTH: "False"
@@ -83,6 +85,28 @@ config:
     AUTH_ROLE_FALLBACK_ENABLED: "true"
     CELERY_RESULT_EXPIRES_SECONDS: "3600"
     JOB_REGISTRY_TTL_SECONDS: "7200"
+
+externalServices:
+  postgresCore:
+    enabled: false
+    host: ""
+    port: 5432
+  postgresAi:
+    enabled: false
+    host: ""
+    port: 5432
+  rabbitmq:
+    enabled: false
+    brokerUrl: ""
+  mongo:
+    enabled: false
+    uri: ""
+  qdrant:
+    enabled: false
+    url: ""
+  redis:
+    enabled: false
+    url: ""
   frontend:
     VITE_API_URL: "/api/"
     VITE_WS_BASE_URL: ""
@@ -186,9 +210,12 @@ images:
     pullPolicy: IfNotPresent
 
 backend:
+  enabled: true
   replicas: 2
   service:
     port: 8000
+  probes:
+    hostHeader: backend
   resources:
     requests:
       cpu: 250m
@@ -291,6 +318,7 @@ gateway:
     minAvailable: 1
 
 postgresCore:
+  enabled: true
   replicas: 1
   service:
     port: 5432
@@ -305,6 +333,7 @@ postgresCore:
       memory: 2Gi
 
 postgresAi:
+  enabled: true
   replicas: 1
   service:
     port: 5432
@@ -333,6 +362,7 @@ redis:
       memory: 512Mi
 
 rabbitmq:
+  enabled: true
   replicas: 1
   service:
     amqpPort: 5672
@@ -348,6 +378,7 @@ rabbitmq:
       memory: 1Gi
 
 mongo:
+  enabled: true
   replicas: 1
   service:
     port: 27017
@@ -362,6 +393,7 @@ mongo:
       memory: 1Gi
 
 qdrant:
+  enabled: true
   replicas: 1
   service:
     httpPort: 6333

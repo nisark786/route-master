@@ -8,15 +8,15 @@ metadata:
 data:
   AI_APP_NAME: {{ .Values.config.ai.AI_APP_NAME | quote }}
   AI_APP_VERSION: {{ .Values.config.ai.AI_APP_VERSION | quote }}
-  CELERY_BROKER_URL: {{ printf "amqp://%s:%s@%s-rabbitmq:%s/%s" .Values.secrets.rabbitmq.username .Values.secrets.rabbitmq.password (include "route-management.fullname" .) (.Values.rabbitmq.service.amqpPort | toString) .Values.secrets.rabbitmq.vhost | quote }}
-  CELERY_RESULT_BACKEND: {{ printf "redis://%s-redis:%v/2" (include "route-management.fullname" .) .Values.redis.service.port | quote }}
+  CELERY_BROKER_URL: {{ ternary .Values.externalServices.rabbitmq.brokerUrl (printf "amqp://%s:%s@%s-rabbitmq:%s/%s" .Values.secrets.rabbitmq.username .Values.secrets.rabbitmq.password (include "route-management.fullname" .) (.Values.rabbitmq.service.amqpPort | toString) .Values.secrets.rabbitmq.vhost) .Values.externalServices.rabbitmq.enabled | quote }}
+  CELERY_RESULT_BACKEND: {{ ternary .Values.externalServices.redis.url (printf "redis://%s-redis:%v/2" (include "route-management.fullname" .) .Values.redis.service.port) .Values.externalServices.redis.enabled | quote }}
   CELERY_RESULT_EXPIRES_SECONDS: {{ .Values.config.ai.CELERY_RESULT_EXPIRES_SECONDS | quote }}
   JOB_REGISTRY_TTL_SECONDS: {{ .Values.config.ai.JOB_REGISTRY_TTL_SECONDS | quote }}
-  AI_DB_HOST: {{ printf "%s-postgres-ai" (include "route-management.fullname" .) | quote }}
-  AI_DB_PORT: {{ .Values.config.ai.AI_DB_PORT | quote }}
+  AI_DB_HOST: {{ ternary .Values.externalServices.postgresAi.host (printf "%s-postgres-ai" (include "route-management.fullname" .)) .Values.externalServices.postgresAi.enabled | quote }}
+  AI_DB_PORT: {{ ternary (.Values.externalServices.postgresAi.port | toString) .Values.config.ai.AI_DB_PORT .Values.externalServices.postgresAi.enabled | quote }}
   AI_DB_NAME: {{ .Values.config.ai.AI_DB_NAME | quote }}
   AI_DB_USER: {{ .Values.config.ai.AI_DB_USER | quote }}
-  QDRANT_URL: {{ printf "http://%s-qdrant:%v" (include "route-management.fullname" .) .Values.qdrant.service.httpPort | quote }}
+  QDRANT_URL: {{ ternary .Values.externalServices.qdrant.url (printf "http://%s-qdrant:%v" (include "route-management.fullname" .) .Values.qdrant.service.httpPort) .Values.externalServices.qdrant.enabled | quote }}
   QDRANT_COLLECTION: {{ .Values.config.ai.QDRANT_COLLECTION | quote }}
   QDRANT_DISTANCE: {{ .Values.config.ai.QDRANT_DISTANCE | quote }}
   EMBEDDING_PROVIDER: {{ .Values.config.ai.EMBEDDING_PROVIDER | quote }}

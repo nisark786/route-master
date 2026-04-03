@@ -29,18 +29,24 @@ class QdrantStore:
     def ensure_collection(self) -> None:
         collections = self.client.get_collections().collections
         exists = any(col.name == self.collection for col in collections)
-        if exists:
-            return
-        self.client.create_collection(
-            collection_name=self.collection,
-            vectors_config=qmodels.VectorParams(
-                size=settings.embedding_dim,
-                distance=_distance_from_setting(),
-            ),
-        )
+        if not exists:
+            self.client.create_collection(
+                collection_name=self.collection,
+                vectors_config=qmodels.VectorParams(
+                    size=settings.embedding_dim,
+                    distance=_distance_from_setting(),
+                ),
+            )
+
+        # Always ensure required payload indexes exist, even for pre-existing collections.
         self.client.create_payload_index(
             collection_name=self.collection,
             field_name="tenant_id",
+            field_schema=qmodels.PayloadSchemaType.KEYWORD,
+        )
+        self.client.create_payload_index(
+            collection_name=self.collection,
+            field_name="doc_id",
             field_schema=qmodels.PayloadSchemaType.KEYWORD,
         )
 

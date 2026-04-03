@@ -1,3 +1,4 @@
+{{- if and .Values.rabbitmq.enabled (not .Values.externalServices.rabbitmq.enabled) }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -18,3 +19,4 @@ spec:
       port: {{ .Values.rabbitmq.service.managementPort }}
       targetPort: management
 ---
+{{- end }}

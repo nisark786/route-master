@@ -30,6 +30,7 @@ env:
   IMAGE_PREFIX: ${{ github.repository_owner }}
   RELEASE_NAME: route-management
   NAMESPACE: route-staging
+  STAGING_PRIVATE_VALUES_RAW: ${{ secrets.STAGING_PRIVATE_VALUES_YAML }}
 
 jobs:
   resolve-image-tag:
@@ -116,6 +117,14 @@ jobs:
           choco install kubernetes-helm --version=3.15.4 -y
           helm version
 
+      - name: Setup AWS CLI (Windows self-hosted)
+        shell: powershell
+        run: |
+          if (-not (Get-Command aws -ErrorAction SilentlyContinue)) {
+            choco install awscli -y
+          }
+          aws --version
+
       - name: Use local kubeconfig (self-hosted)
         shell: powershell
         run: |
@@ -126,6 +135,32 @@ jobs:
           $env:KUBECONFIG = $kubeConfigPath
           Write-Host "Using local kubeconfig at $kubeConfigPath"
           kubectl cluster-info
+
+      - name: Pre-deploy auth/addon/secret checks
+        shell: powershell
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:STAGING_PRIVATE_VALUES_RAW)) {
+            throw "STAGING_PRIVATE_VALUES_YAML secret is empty."
+          }
+
+          if ($env:STAGING_PRIVATE_VALUES_RAW.Contains("__REQUIRED__")) {
+            throw "STAGING_PRIVATE_VALUES_YAML still contains __REQUIRED__ placeholders."
+          }
+
+          aws sts get-caller-identity | Out-Null
+          kubectl auth can-i get pods -n $env:NAMESPACE | Out-Null
+
+          $currentContext = kubectl config current-context
+          if ($currentContext -like "arn:aws:eks:*") {
+            $parts = $currentContext.Split(":")
+            $region = $parts[3]
+            $clusterName = $parts[$parts.Length - 1].Split("/")[1]
+            Write-Host "Detected EKS context for cluster '$clusterName' in region '$region'"
+            $addons = aws eks list-addons --cluster-name $clusterName --region $region | ConvertFrom-Json
+            if (-not ($addons.addons -contains "aws-ebs-csi-driver")) {
+              throw "EKS addon aws-ebs-csi-driver is missing. Install it before deploy."
+            }
+          }
 
       - name: Write staging private values
         shell: powershell
