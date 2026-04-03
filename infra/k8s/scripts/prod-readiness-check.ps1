@@ -44,11 +44,16 @@ $manifest = $rendered -join "`n"
 
 $blockedPatterns = @(
   @{ Pattern = "__REQUIRED__"; Message = "Required placeholder values still present." },
+  @{ Pattern = "__PRODUCTION_HOST__"; Message = "Production host placeholder is still present." },
   @{ Pattern = "__NIP_IO_HOST__"; Message = "NIP host placeholder is still present." },
   @{ Pattern = "change-me-"; Message = "Default insecure secrets still present." },
   @{ Pattern = "route\.example\.com"; Message = "Example domain is still configured." },
   @{ Pattern = "route\.local"; Message = "Local domain still present in production manifest." },
-  @{ Pattern = "dev-secret"; Message = "Development secret detected in production manifest." }
+  @{ Pattern = "dev-secret"; Message = "Development secret detected in production manifest." },
+  @{ Pattern = "elb\.amazonaws\.com"; Message = "AWS ELB hostname is still being used as the production app host." },
+  @{ Pattern = "localhost"; Message = "localhost is still present in the production manifest." },
+  @{ Pattern = "127\.0\.0\.1"; Message = "Loopback IP is still present in the production manifest." },
+  @{ Pattern = ":latest"; Message = "Mutable :latest image tags are still present in the production manifest." }
 )
 
 if (-not $AllowTestPaymentKeys) {

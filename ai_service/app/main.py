@@ -2,6 +2,7 @@ import logging
 import time
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 from app.core.config import settings
 from app.routes.ai import router as ai_router
@@ -12,6 +13,16 @@ app = FastAPI(
     title=settings.app_name,
     version=settings.app_version
 )
+
+if settings.cors_allowed_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_allowed_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
 Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 logger = logging.getLogger(__name__)

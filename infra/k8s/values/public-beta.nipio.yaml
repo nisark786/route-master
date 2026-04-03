@@ -30,14 +30,23 @@ ingress:
 config:
   core:
     DEBUG: "False"
-    ALLOWED_HOSTS: "__NIP_IO_HOST__"
-    CORS_ALLOWED_ORIGINS: "https://__NIP_IO_HOST__"
+    ALLOWED_HOSTS: "__NIP_IO_HOST__,route-master-sales.vercel.app"
+    CORS_ALLOWED_ORIGINS: "https://__NIP_IO_HOST__,https://route-master-sales.vercel.app"
     USE_S3_MEDIA: "True"
     AWS_S3_MEDIA_PREFIX: "media"
     AWS_QUERYSTRING_AUTH: "False"
   ai:
+    CORS_ALLOWED_ORIGINS: "https://__NIP_IO_HOST__,https://route-master-sales.vercel.app"
     EMBEDDING_PROVIDER: "huggingface"
     QDRANT_COLLECTION: "route_docs_prod"
+
+images:
+  backend:
+    tag: "__REQUIRED__"
+  aiService:
+    tag: "__REQUIRED__"
+  frontend:
+    tag: "__REQUIRED__"
 
 backend:
   replicas: 2

@@ -8,9 +8,18 @@ def get_env(name: str, default: str | None = None) -> str | None:
     return value.strip()
 
 
+def get_csv_env(name: str, default: str = "") -> list[str]:
+    raw = get_env(name, default) or ""
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
 class Settings:
     app_name: str = get_env("AI_APP_NAME", "AI Service")
     app_version: str = get_env("AI_APP_VERSION", "1.0.0")
+    cors_allowed_origins: list[str] = get_csv_env(
+        "CORS_ALLOWED_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173",
+    )
 
     qdrant_url: str = get_env("QDRANT_URL", "http://qdrant:6333")
     qdrant_api_key: str | None = get_env("QDRANT_API_KEY", "")

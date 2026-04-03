@@ -26,9 +26,9 @@ services:
     image: rabbitmq:3-management-alpine
     container_name: route_rabbitmq
     environment:
-      RABBITMQ_DEFAULT_USER: "route_user"
-      RABBITMQ_DEFAULT_PASS: "route_pass"
-      RABBITMQ_DEFAULT_VHOST: "route_vhost"
+      RABBITMQ_DEFAULT_USER: "${RABBITMQ_DEFAULT_USER:-route_user}"
+      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_DEFAULT_PASS:-route_pass}"
+      RABBITMQ_DEFAULT_VHOST: "${RABBITMQ_DEFAULT_VHOST:-route_vhost}"
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -77,7 +77,7 @@ services:
       AWS_S3_CUSTOM_DOMAIN: "${AWS_S3_CUSTOM_DOMAIN:-}"
       AWS_S3_MEDIA_PREFIX: "${AWS_S3_MEDIA_PREFIX:-media}"
       AWS_QUERYSTRING_AUTH: "${AWS_QUERYSTRING_AUTH:-False}"
-      CELERY_BROKER_URL: "amqp://route_user:route_pass@rabbitmq:5672/route_vhost"
+      CELERY_BROKER_URL: "${CORE_CELERY_BROKER_URL:-amqp://route_user:route_pass@rabbitmq:5672/route_vhost}"
       CELERY_RESULT_BACKEND: "redis://redis:6379/1"
       SEND_OTP_ASYNC: "True"
       MONGO_URI: "mongodb://mongo:27017"
@@ -123,7 +123,7 @@ services:
       AWS_S3_CUSTOM_DOMAIN: "${AWS_S3_CUSTOM_DOMAIN:-}"
       AWS_S3_MEDIA_PREFIX: "${AWS_S3_MEDIA_PREFIX:-media}"
       AWS_QUERYSTRING_AUTH: "${AWS_QUERYSTRING_AUTH:-False}"
-      CELERY_BROKER_URL: "amqp://route_user:route_pass@rabbitmq:5672/route_vhost"
+      CELERY_BROKER_URL: "${CORE_CELERY_BROKER_URL:-amqp://route_user:route_pass@rabbitmq:5672/route_vhost}"
       CELERY_RESULT_BACKEND: "redis://redis:6379/1"
       SEND_OTP_ASYNC: "True"
       MONGO_URI: "mongodb://mongo:27017"
@@ -167,7 +167,7 @@ services:
       AWS_S3_CUSTOM_DOMAIN: "${AWS_S3_CUSTOM_DOMAIN:-}"
       AWS_S3_MEDIA_PREFIX: "${AWS_S3_MEDIA_PREFIX:-media}"
       AWS_QUERYSTRING_AUTH: "${AWS_QUERYSTRING_AUTH:-False}"
-      CELERY_BROKER_URL: "amqp://route_user:route_pass@rabbitmq:5672/route_vhost"
+      CELERY_BROKER_URL: "${CORE_CELERY_BROKER_URL:-amqp://route_user:route_pass@rabbitmq:5672/route_vhost}"
       CELERY_RESULT_BACKEND: "redis://redis:6379/1"
       SEND_OTP_ASYNC: "True"
       AI_AUTOSYNC_ENABLED: "True"
@@ -228,7 +228,7 @@ services:
     env_file:
       - ./ai_service/.env
     environment:
-      CELERY_BROKER_URL: "amqp://route_user:route_pass@rabbitmq:5672/route_vhost"
+      CELERY_BROKER_URL: "${AI_CELERY_BROKER_URL:-amqp://route_user:route_pass@rabbitmq:5672/route_vhost}"
       CELERY_RESULT_BACKEND: "redis://redis:6379/2"
     depends_on:
       ai_db:
@@ -257,7 +257,7 @@ services:
     env_file:
       - ./ai_service/.env
     environment:
-      CELERY_BROKER_URL: "amqp://route_user:route_pass@rabbitmq:5672/route_vhost"
+      CELERY_BROKER_URL: "${AI_CELERY_BROKER_URL:-amqp://route_user:route_pass@rabbitmq:5672/route_vhost}"
       CELERY_RESULT_BACKEND: "redis://redis:6379/2"
     depends_on:
       qdrant:
@@ -317,8 +317,8 @@ services:
     image: grafana/grafana:11.2.0
     container_name: route_grafana
     environment:
-      GF_SECURITY_ADMIN_USER: "admin"
-      GF_SECURITY_ADMIN_PASSWORD: "admin123"
+      GF_SECURITY_ADMIN_USER: "${GRAFANA_ADMIN_USER:-admin}"
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-change-me-local-grafana}"
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - grafana_data:/var/lib/grafana
@@ -339,12 +339,12 @@ services:
       - "9121:9121"
 
   rabbitmq_exporter:
-    image: kbudde/rabbitmq-exporter:latest
+    image: kbudde/rabbitmq-exporter:v1.0.0-RC19.1
     container_name: route_rabbitmq_exporter
     environment:
       RABBIT_URL: "http://rabbitmq:15672"
-      RABBIT_USER: "route_user"
-      RABBIT_PASSWORD: "route_pass"
+      RABBIT_USER: "${RABBITMQ_DEFAULT_USER:-route_user}"
+      RABBIT_PASSWORD: "${RABBITMQ_DEFAULT_PASS:-route_pass}"
       PUBLISH_PORT: "9419"
       OUTPUT_FORMAT: "TTY"
     depends_on:
@@ -357,7 +357,7 @@ services:
     image: prometheuscommunity/postgres-exporter:v0.16.0
     container_name: route_postgres_exporter_core
     environment:
-      DATA_SOURCE_NAME: "postgresql://postgres:asdf1234%23%2B@db:5432/route_db?sslmode=disable"
+      DATA_SOURCE_NAME: "${CORE_POSTGRES_EXPORTER_DSN:-postgresql://postgres:${CORE_DB_PASSWORD_URLENC:-change-me-local-db-password}@db:5432/route_db?sslmode=disable}"
     depends_on:
       db:
         condition: service_healthy
@@ -368,7 +368,7 @@ services:
     image: prometheuscommunity/postgres-exporter:v0.16.0
     container_name: route_postgres_exporter_ai
     environment:
-      DATA_SOURCE_NAME: "postgresql://postgres:asdf1234%23%2B@ai_db:5432/route_ai_db?sslmode=disable"
+      DATA_SOURCE_NAME: "${AI_POSTGRES_EXPORTER_DSN:-postgresql://postgres:${AI_DB_PASSWORD_URLENC:-change-me-local-ai-db-password}@ai_db:5432/route_ai_db?sslmode=disable}"
     depends_on:
       ai_db:
         condition: service_healthy

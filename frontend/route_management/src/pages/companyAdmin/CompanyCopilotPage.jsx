@@ -15,7 +15,6 @@ import { extractApiErrorMessage } from "../../utils/adminUi";
 
 export default function CompanyCopilotPage() {
   const [dispatchTopN, setDispatchTopN] = useState(5);
-  const [dispatchPlanId, setDispatchPlanId] = useState("");
   const [dispatchScheduledAt, setDispatchScheduledAt] = useState(() => {
     const target = new Date(Date.now() + 30 * 60 * 1000);
     const pad = (num) => String(num).padStart(2, "0");
@@ -117,7 +116,6 @@ export default function CompanyCopilotPage() {
       setDispatchSuggestions(suggestions);
       setSelectedRouteIds(suggestions.map((item) => item.route_id).filter(Boolean));
       setUnmatchedRoutes(Array.isArray(response?.unmatched_route_ids) ? response.unmatched_route_ids : []);
-      setDispatchPlanId(response?.plan_id || "");
       toast.success("Dispatch copilot recommendations loaded.");
     } catch {
       // handled by RTK mutation state
@@ -125,20 +123,24 @@ export default function CompanyCopilotPage() {
   };
 
   const handleApproveDispatch = async () => {
-    if (!dispatchPlanId) {
-      toast.error("Generate a dispatch plan before approval.");
+    if (!dispatchSuggestions.length) {
+      toast.error("Generate dispatch recommendations before approval.");
       return;
     }
     if (!dispatchScheduledAt) {
       toast.error("Select scheduled time.");
       return;
     }
+    const selectedSuggestions = dispatchSuggestions.filter((item) => selectedRouteIds.includes(item.route_id));
+    if (!selectedSuggestions.length) {
+      toast.error("Select at least one dispatch recommendation to approve.");
+      return;
+    }
 
     try {
       const response = await approveAiDispatchCopilot({
-        plan_id: dispatchPlanId,
         scheduled_at: new Date(dispatchScheduledAt).toISOString(),
-        route_ids: selectedRouteIds,
+        suggestions: selectedSuggestions,
       }).unwrap();
 
       const assignments = Array.isArray(response?.assignments) ? response.assignments : [];
@@ -258,12 +260,11 @@ export default function CompanyCopilotPage() {
           <button
             type="button"
             className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-black uppercase tracking-widest text-white hover:bg-indigo-700 disabled:opacity-60"
-            disabled={isApprovingDispatch || isDispatchLoading || !dispatchPlanId || !selectedRouteIds.length}
+            disabled={isApprovingDispatch || isDispatchLoading || !dispatchSuggestions.length || !selectedRouteIds.length}
             onClick={handleApproveDispatch}
           >
             {isApprovingDispatch ? "Approving..." : "Approve Plan"}
           </button>
-          {dispatchPlanId ? <p className="text-xs font-semibold text-slate-500">Plan ID: {dispatchPlanId}</p> : null}
           <p className="text-xs font-semibold text-slate-500">Selected Routes: {selectedRouteIds.length}</p>
         </div>
 

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import Any, TypedDict
 
+import jwt
 from langgraph.graph import END, StateGraph
 
+from app.core.config import settings
 from app.schemas.ai import (
     DispatchCopilotApproveRequest,
     DispatchCopilotApproveResponse,
@@ -15,7 +18,6 @@ from app.schemas.ai import (
     DispatchRoute,
     DispatchVehicle,
 )
-from app.services.plan_registry import plan_registry
 
 
 def _driver_status_score(status: str) -> tuple[float, str]:
@@ -86,13 +88,11 @@ class DispatchGenerationState(TypedDict, total=False):
     scored: list[dict[str, Any]]
     suggestions: list[DispatchCopilotSuggestion]
     unmatched_route_ids: list[str]
-    plan_id: str
 
 
 class DispatchApprovalState(TypedDict, total=False):
     tenant_id: str
     payload: DispatchCopilotApproveRequest
-    plan: dict[str, Any] | None
     assignments: list[DispatchCopilotApprovedAssignment]
 
 
@@ -104,10 +104,11 @@ class DispatchCopilotService:
     def suggest(self, tenant_id: str, payload: DispatchCopilotRequest) -> DispatchCopilotResponse:
         state: DispatchGenerationState = {"tenant_id": tenant_id, "payload": payload}
         result = self._generate_graph.invoke(state)
+        suggestions = result.get("suggestions", []) or []
         return DispatchCopilotResponse(
             tenant_id=tenant_id,
-            plan_id=str(result.get("plan_id") or ""),
-            suggestions=result.get("suggestions", []) or [],
+            plan_id=self._encode_plan_token(tenant_id=tenant_id, suggestions=suggestions),
+            suggestions=suggestions,
             unmatched_route_ids=result.get("unmatched_route_ids", []) or [],
         )
 
@@ -123,24 +124,57 @@ class DispatchCopilotService:
         )
 
     @staticmethod
+    def _plan_signing_secret() -> str:
+        secret = (settings.auth_internal_token_secret or settings.auth_jwt_secret or "").strip()
+        if not secret:
+            raise ValueError("Dispatch plan signing secret is not configured.")
+        return secret
+
+    @classmethod
+    def _encode_plan_token(cls, tenant_id: str, suggestions: list[DispatchCopilotSuggestion]) -> str:
+        if not suggestions:
+            return ""
+        payload = {
+            "sub": "dispatch_copilot_plan",
+            "tenant_id": tenant_id,
+            "suggestions": [item.model_dump() for item in suggestions],
+            "exp": datetime.now(UTC) + timedelta(minutes=15),
+        }
+        return jwt.encode(payload, cls._plan_signing_secret(), algorithm=settings.auth_internal_token_algorithm)
+
+    @classmethod
+    def _decode_plan_token(cls, tenant_id: str, token: str) -> list[DispatchCopilotSuggestion]:
+        if not token:
+            raise ValueError("Dispatch plan token is required when suggestions are not provided.")
+        try:
+            payload = jwt.decode(
+                token,
+                cls._plan_signing_secret(),
+                algorithms=[settings.auth_internal_token_algorithm],
+                options={"verify_aud": False, "verify_iss": False},
+            )
+        except jwt.PyJWTError as exc:
+            raise ValueError("Dispatch plan token is invalid or expired.") from exc
+        if str(payload.get("tenant_id") or "") != str(tenant_id):
+            raise ValueError("Dispatch plan does not belong to this tenant.")
+        raw_suggestions = payload.get("suggestions", []) or []
+        return [DispatchCopilotSuggestion.model_validate(item) for item in raw_suggestions]
+
+    @staticmethod
     def _build_generate_graph():
         graph = StateGraph(DispatchGenerationState)
         graph.add_node("score", DispatchCopilotService._node_score_candidates)
         graph.add_node("select", DispatchCopilotService._node_select_recommendations)
-        graph.add_node("persist", DispatchCopilotService._node_persist_plan)
         graph.set_entry_point("score")
         graph.add_edge("score", "select")
-        graph.add_edge("select", "persist")
-        graph.add_edge("persist", END)
+        graph.add_edge("select", END)
         return graph.compile()
 
     @staticmethod
     def _build_approve_graph():
         graph = StateGraph(DispatchApprovalState)
-        graph.add_node("load_plan", DispatchCopilotService._node_load_plan)
         graph.add_node("build_assignments", DispatchCopilotService._node_build_assignments)
-        graph.set_entry_point("load_plan")
-        graph.add_edge("load_plan", "build_assignments")
+        graph.set_entry_point("build_assignments")
         graph.add_edge("build_assignments", END)
         return graph.compile()
 
@@ -207,47 +241,31 @@ class DispatchCopilotService:
         return {"suggestions": suggestions, "unmatched_route_ids": unmatched}
 
     @staticmethod
-    def _node_persist_plan(state: DispatchGenerationState) -> DispatchGenerationState:
-        tenant_id = state["tenant_id"]
-        suggestions = state.get("suggestions", []) or []
-        unmatched = state.get("unmatched_route_ids", []) or []
-        plan_id = plan_registry.create(
-            tenant_id=tenant_id,
-            suggestions=[item.model_dump() for item in suggestions],
-            unmatched_route_ids=unmatched,
-        )
-        return {"plan_id": plan_id}
-
-    @staticmethod
-    def _node_load_plan(state: DispatchApprovalState) -> DispatchApprovalState:
-        payload = state["payload"]
-        plan = plan_registry.get(payload.plan_id)
-        if not plan:
-            raise ValueError("Dispatch plan not found or expired.")
-        if str(plan.get("tenant_id")) != str(state["tenant_id"]):
-            raise ValueError("Dispatch plan does not belong to this tenant.")
-        return {"plan": plan}
-
-    @staticmethod
     def _node_build_assignments(state: DispatchApprovalState) -> DispatchApprovalState:
+        tenant_id = state["tenant_id"]
         payload = state["payload"]
-        plan = state.get("plan") or {}
-        suggestions = plan.get("suggestions", []) or []
-        route_set = set(payload.route_ids or [])
-        selected = [item for item in suggestions if not route_set or item.get("route_id") in route_set]
+        selected_suggestions = payload.suggestions
+        if not selected_suggestions:
+            decoded_suggestions = DispatchCopilotService._decode_plan_token(tenant_id=tenant_id, token=payload.plan_id)
+            route_set = set(payload.route_ids or [])
+            selected_suggestions = [
+                item for item in decoded_suggestions if not route_set or item.route_id in route_set
+            ]
+        if not selected_suggestions:
+            raise ValueError("Select at least one dispatch suggestion before approval.")
 
         assignments = [
             DispatchCopilotApprovedAssignment(
-                route_id=str(item.get("route_id") or ""),
-                route_name=str(item.get("route_name") or ""),
-                driver_id=str(item.get("driver_id") or ""),
-                driver_name=str(item.get("driver_name") or ""),
-                vehicle_id=str(item.get("vehicle_id") or ""),
-                vehicle_name=str(item.get("vehicle_name") or ""),
-                vehicle_number_plate=str(item.get("vehicle_number_plate") or ""),
+                route_id=item.route_id,
+                route_name=item.route_name,
+                driver_id=item.driver_id,
+                driver_name=item.driver_name,
+                vehicle_id=item.vehicle_id,
+                vehicle_name=item.vehicle_name,
+                vehicle_number_plate=item.vehicle_number_plate,
                 scheduled_at=payload.scheduled_at,
             )
-            for item in selected
+            for item in selected_suggestions
         ]
         return {"assignments": assignments}
 

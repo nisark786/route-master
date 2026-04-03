@@ -1,6 +1,5 @@
 import "package:firebase_core/firebase_core.dart";
 import "package:firebase_messaging/firebase_messaging.dart";
-import "package:flutter/foundation.dart";
 import "package:shared_preferences/shared_preferences.dart";
 
 import "local_notification_service.dart";
@@ -31,7 +30,7 @@ class PushNotificationService {
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
 
   Future<void> initialize() async {
-    final settings = await _messaging.requestPermission(
+    await _messaging.requestPermission(
       alert: true,
       announcement: false,
       badge: true,
@@ -40,9 +39,6 @@ class PushNotificationService {
       provisional: false,
       sound: true,
     );
-    if (kDebugMode) {
-      debugPrint("FCM permission status: ${settings.authorizationStatus}");
-    }
 
     await _saveToken(await _messaging.getToken());
     _messaging.onTokenRefresh.listen(_saveToken);
@@ -62,25 +58,13 @@ class PushNotificationService {
       );
     });
 
-    FirebaseMessaging.onMessageOpenedApp.listen((message) {
-      if (kDebugMode) {
-        debugPrint("FCM open event: ${message.messageId}");
-      }
-    });
-
-    final initialMessage = await _messaging.getInitialMessage();
-    if (initialMessage != null && kDebugMode) {
-      debugPrint("FCM initial message: ${initialMessage.messageId}");
-    }
+    await _messaging.getInitialMessage();
   }
 
   Future<void> _saveToken(String? token) async {
     if (token == null || token.isEmpty) return;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_fcmTokenStorageKey, token);
-    if (kDebugMode) {
-      debugPrint("FCM token: $token");
-    }
   }
 
   Future<String?> getSavedToken() async {

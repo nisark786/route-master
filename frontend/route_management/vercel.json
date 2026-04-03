@@ -1,8 +1,0 @@
-{
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "https://a51c0ffc6c1374c528b9c872c45b0695-165608962.ap-south-1.elb.amazonaws.com/api/:path*"
-    }
-  ]
-}

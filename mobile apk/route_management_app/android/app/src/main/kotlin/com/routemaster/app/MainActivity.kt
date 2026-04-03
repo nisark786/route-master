@@ -1,4 +1,4 @@
-package com.example.route_management_app
+package com.routemaster.app
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -225,7 +225,7 @@ async def approve_dispatch_copilot(
             detail=str(exc),
         ) from exc
     except Exception as exc:
-        logger.exception("dispatch_copilot_approve_failed tenant=%s plan_id=%s", tenant_id, payload.plan_id)
+        logger.exception("dispatch_copilot_approve_failed tenant=%s suggestions=%s", tenant_id, len(payload.suggestions))
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Dispatch approval failed: {exc}",

@@ -94,13 +94,14 @@ class DispatchCopilotSuggestion(BaseModel):
 
 class DispatchCopilotResponse(BaseModel):
     tenant_id: str
-    plan_id: str
+    plan_id: str = ""
     suggestions: list[DispatchCopilotSuggestion]
     unmatched_route_ids: list[str] = Field(default_factory=list)
 
 
 class DispatchCopilotApproveRequest(BaseModel):
-    plan_id: str = Field(min_length=1)
+    suggestions: list[DispatchCopilotSuggestion] = Field(default_factory=list)
+    plan_id: str = ""
     route_ids: list[str] = Field(default_factory=list)
     scheduled_at: str = Field(min_length=1)
 
@@ -118,7 +119,7 @@ class DispatchCopilotApprovedAssignment(BaseModel):
 
 class DispatchCopilotApproveResponse(BaseModel):
     tenant_id: str
-    plan_id: str
+    plan_id: str = ""
     approved: int
     assignments: list[DispatchCopilotApprovedAssignment] = Field(default_factory=list)
 

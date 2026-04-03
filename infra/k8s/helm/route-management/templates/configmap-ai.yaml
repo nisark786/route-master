@@ -8,6 +8,7 @@ metadata:
 data:
   AI_APP_NAME: {{ .Values.config.ai.AI_APP_NAME | quote }}
   AI_APP_VERSION: {{ .Values.config.ai.AI_APP_VERSION | quote }}
+  CORS_ALLOWED_ORIGINS: {{ .Values.config.ai.CORS_ALLOWED_ORIGINS | quote }}
   CELERY_BROKER_URL: {{ ternary .Values.externalServices.rabbitmq.brokerUrl (printf "amqp://%s:%s@%s-rabbitmq:%s/%s" .Values.secrets.rabbitmq.username .Values.secrets.rabbitmq.password (include "route-management.fullname" .) (.Values.rabbitmq.service.amqpPort | toString) .Values.secrets.rabbitmq.vhost) .Values.externalServices.rabbitmq.enabled | quote }}
   CELERY_RESULT_BACKEND: {{ ternary .Values.externalServices.redis.url (printf "redis://%s-redis:%v/2" (include "route-management.fullname" .) .Values.redis.service.port) .Values.externalServices.redis.enabled | quote }}
   CELERY_RESULT_EXPIRES_SECONDS: {{ .Values.config.ai.CELERY_RESULT_EXPIRES_SECONDS | quote }}

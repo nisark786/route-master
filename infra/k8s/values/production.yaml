@@ -6,9 +6,10 @@ global:
 ingress:
   enabled: true
   className: nginx
-  annotations: {}
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
   hosts:
-    - host: a51c0ffc6c1374c528b9c872c45b0695-165608962.ap-south-1.elb.amazonaws.com
+    - host: "__PRODUCTION_HOST__"
       paths:
         - path: /api
           pathType: Prefix
@@ -25,19 +26,28 @@ ingress:
   tls:
     - secretName: route-prod-tls
       hosts:
-        - a51c0ffc6c1374c528b9c872c45b0695-165608962.ap-south-1.elb.amazonaws.com
+        - "__PRODUCTION_HOST__"
 
 config:
   core:
     DEBUG: "False"
-    ALLOWED_HOSTS: "a51c0ffc6c1374c528b9c872c45b0695-165608962.ap-south-1.elb.amazonaws.com,route-master-sales.vercel.app,backend,route-management-backend,localhost,127.0.0.1"
-    CORS_ALLOWED_ORIGINS: "http://a51c0ffc6c1374c528b9c872c45b0695-165608962.ap-south-1.elb.amazonaws.com,https://a51c0ffc6c1374c528b9c872c45b0695-165608962.ap-south-1.elb.amazonaws.com,https://route-master-sales.vercel.app"
+    ALLOWED_HOSTS: "__PRODUCTION_HOST__,backend,route-management-backend"
+    CORS_ALLOWED_ORIGINS: "https://__PRODUCTION_HOST__,https://route-master-sales.vercel.app"
     USE_S3_MEDIA: "True"
     AWS_S3_MEDIA_PREFIX: "media"
     AWS_QUERYSTRING_AUTH: "False"
   ai:
+    CORS_ALLOWED_ORIGINS: "https://__PRODUCTION_HOST__,https://route-master-sales.vercel.app"
     EMBEDDING_PROVIDER: "huggingface"
     QDRANT_COLLECTION: "route_docs_prod"
+
+images:
+  backend:
+    tag: "__REQUIRED__"
+  aiService:
+    tag: "__REQUIRED__"
+  frontend:
+    tag: "__REQUIRED__"
 
 secrets:
   core:
