@@ -2,11 +2,13 @@ import logging
 import random
 import threading
 from decimal import Decimal, ROUND_HALF_UP
+from datetime import timedelta
 from django.core.cache import cache
 from django.contrib.auth.hashers import check_password, make_password
 import razorpay
 from django.conf import settings
 from django.core.mail import send_mail
+from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken
 
 logger = logging.getLogger(__name__)
@@ -40,15 +42,57 @@ def _otp_cache_key(registration_id):
 
 def store_registration_otp(registration_id, otp):
     hashed = hash_otp(otp)
-    cache.set(_otp_cache_key(registration_id), hashed, timeout=_otp_cache_ttl_seconds())
+    ttl_seconds = _otp_cache_ttl_seconds()
+
+    try:
+        cache.set(_otp_cache_key(registration_id), hashed, timeout=ttl_seconds)
+    except Exception:
+        logger.exception("Failed to write registration OTP to cache for %s", registration_id)
+
+    from .models import PendingCompanyRegistration
+
+    PendingCompanyRegistration.objects.filter(id=registration_id).update(
+        otp_code=hashed,
+        otp_expires_at=timezone.now() + timedelta(seconds=ttl_seconds),
+        updated_at=timezone.now(),
+    )
 
 
 def get_registration_otp_hash(registration_id):
-    return cache.get(_otp_cache_key(registration_id))
+    try:
+        hashed = cache.get(_otp_cache_key(registration_id))
+        if hashed:
+            return hashed
+    except Exception:
+        logger.exception("Failed to read registration OTP from cache for %s", registration_id)
+
+    from .models import PendingCompanyRegistration
+
+    registration = (
+        PendingCompanyRegistration.objects.filter(id=registration_id)
+        .only("otp_code", "otp_expires_at")
+        .first()
+    )
+    if not registration or not registration.otp_code:
+        return None
+    if registration.otp_expires_at and registration.otp_expires_at <= timezone.now():
+        return None
+    return registration.otp_code
 
 
 def delete_registration_otp(registration_id):
-    cache.delete(_otp_cache_key(registration_id))
+    try:
+        cache.delete(_otp_cache_key(registration_id))
+    except Exception:
+        logger.exception("Failed to delete registration OTP from cache for %s", registration_id)
+
+    from .models import PendingCompanyRegistration
+
+    PendingCompanyRegistration.objects.filter(id=registration_id).update(
+        otp_code="",
+        otp_expires_at=None,
+        updated_at=timezone.now(),
+    )
 
 
 def send_registration_otp(email, otp):
