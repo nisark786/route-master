@@ -1,4 +1,6 @@
+import logging
 import random
+import threading
 from decimal import Decimal, ROUND_HALF_UP
 from django.core.cache import cache
 from django.contrib.auth.hashers import check_password, make_password
@@ -6,6 +8,8 @@ import razorpay
 from django.conf import settings
 from django.core.mail import send_mail
 from rest_framework_simplejwt.tokens import RefreshToken
+
+logger = logging.getLogger(__name__)
 
 
 def get_razorpay_client():
@@ -67,9 +71,24 @@ def queue_registration_otp(email, otp):
 
     try:
         from .tasks import send_registration_otp_email_task
-        send_registration_otp_email_task.delay(email, otp)
+        send_registration_otp_email_task.apply_async((email, otp), retry=False, ignore_result=True)
     except Exception:
+        logger.exception("Async OTP dispatch failed; falling back to direct email send.")
         send_registration_otp(email, otp)
+
+
+def dispatch_registration_otp_background(email, otp):
+    def _runner():
+        try:
+            queue_registration_otp(email, otp)
+        except Exception:
+            logger.exception("Background OTP dispatch failed for %s", email)
+
+    threading.Thread(
+        target=_runner,
+        name=f"registration-otp-{email}",
+        daemon=True,
+    ).start()
 
 
 def create_subscription_order(plan, receipt):

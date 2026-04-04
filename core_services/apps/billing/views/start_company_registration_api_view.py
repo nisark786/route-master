@@ -1,3 +1,4 @@
+from django.db import transaction
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
@@ -7,7 +8,11 @@ from rest_framework.views import APIView
 
 from apps.billing.models import PendingCompanyRegistration
 from apps.billing.serializers import StartRegistrationSerializer
-from apps.billing.services import generate_otp, queue_registration_otp, store_registration_otp
+from apps.billing.services import (
+    dispatch_registration_otp_background,
+    generate_otp,
+    store_registration_otp,
+)
 
 
 class StartCompanyRegistrationAPIView(APIView):
@@ -39,18 +44,21 @@ class StartCompanyRegistrationAPIView(APIView):
         data = serializer.validated_data
         otp = generate_otp()
 
-        registration = PendingCompanyRegistration.objects.create(
-            company_name=data["company_name"],
-            official_email=data["official_email"],
-            phone=data.get("phone", ""),
-            address=data.get("address", ""),
-            admin_email=data["admin_email"],
-            admin_password_hash=data["admin_password_hash"],
-            plan=data["plan"],
-            status=PendingCompanyRegistration.STATUS_PENDING_OTP,
-        )
-        store_registration_otp(registration.id, otp)
-        queue_registration_otp(registration.official_email, otp)
+        with transaction.atomic():
+            registration = PendingCompanyRegistration.objects.create(
+                company_name=data["company_name"],
+                official_email=data["official_email"],
+                phone=data.get("phone", ""),
+                address=data.get("address", ""),
+                admin_email=data["admin_email"],
+                admin_password_hash=data["admin_password_hash"],
+                plan=data["plan"],
+                status=PendingCompanyRegistration.STATUS_PENDING_OTP,
+            )
+            store_registration_otp(registration.id, otp)
+            transaction.on_commit(
+                lambda: dispatch_registration_otp_background(registration.official_email, otp)
+            )
 
         return Response(
             {"registration_id": registration.id, "message": "OTP sent to company official email."},

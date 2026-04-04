@@ -1,3 +1,4 @@
+from django.db import transaction
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
@@ -7,7 +8,11 @@ from rest_framework.views import APIView
 
 from apps.billing.models import PendingCompanyRegistration
 from apps.billing.serializers import RegistrationOnlySerializer
-from apps.billing.services import generate_otp, queue_registration_otp, store_registration_otp
+from apps.billing.services import (
+    dispatch_registration_otp_background,
+    generate_otp,
+    store_registration_otp,
+)
 
 
 class ResendCompanyRegistrationOtpAPIView(APIView):
@@ -41,10 +46,12 @@ class ResendCompanyRegistrationOtpAPIView(APIView):
             return Response({"message": "Registration not available."}, status=status.HTTP_400_BAD_REQUEST)
 
         otp = generate_otp()
-        store_registration_otp(registration.id, otp)
-        registration.status = PendingCompanyRegistration.STATUS_PENDING_OTP
-        registration.is_verified = False
-        registration.save(update_fields=["status", "is_verified", "updated_at"])
-
-        queue_registration_otp(registration.official_email, otp)
+        with transaction.atomic():
+            store_registration_otp(registration.id, otp)
+            registration.status = PendingCompanyRegistration.STATUS_PENDING_OTP
+            registration.is_verified = False
+            registration.save(update_fields=["status", "is_verified", "updated_at"])
+            transaction.on_commit(
+                lambda: dispatch_registration_otp_background(registration.official_email, otp)
+            )
         return Response({"message": "OTP resent successfully."}, status=status.HTTP_200_OK)
