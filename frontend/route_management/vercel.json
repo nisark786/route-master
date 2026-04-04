@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://13-232-122-203.nip.io/api/:path*"
+    },
+    {
+      "source": "/media/:path*",
+      "destination": "https://13-232-122-203.nip.io/media/:path*"
+    }
+  ]
+}
