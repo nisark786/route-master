@@ -159,6 +159,29 @@ function resolveAudioUrl(url) {
   return `${window.location.origin}${url}`;
 }
 
+function buildContactPresenceMap(contacts) {
+  const nextPresence = {};
+  contacts.forEach((contact) => {
+    nextPresence[contact.id] = {
+      is_online: Boolean(contact.is_online),
+      last_seen_at: contact.last_seen_at || null,
+    };
+  });
+  return nextPresence;
+}
+
+function getTimestampMs() {
+  return Date.now();
+}
+
+function createLocalVoiceMessageId() {
+  return `local-voice-${getTimestampMs()}-${crypto.randomUUID().slice(0, 8)}`;
+}
+
+function createVoiceFileName() {
+  return `voice-${getTimestampMs()}.webm`;
+}
+
 export default function ChatWorkspace({
   title,
   subtitle,
@@ -207,7 +230,7 @@ export default function ChatWorkspace({
   const [liveMessages, setLiveMessages] = useState([]);
   const [updatedMessages, setUpdatedMessages] = useState([]);
   const [deletedMessageIds, setDeletedMessageIds] = useState([]);
-  const [contactPresence, setContactPresence] = useState({});
+  const [contactPresenceOverrides, setContactPresenceOverrides] = useState({});
   const [typingByUserId, setTypingByUserId] = useState({});
   const [recordingByUserId, setRecordingByUserId] = useState({});
   const [isRecording, setIsRecording] = useState(false);
@@ -235,12 +258,16 @@ export default function ChatWorkspace({
     () => contacts.find((contact) => contact.id === effectiveSelectedContactId) || null,
     [contacts, effectiveSelectedContactId]
   );
+  const baseContactPresence = useMemo(() => buildContactPresenceMap(contacts), [contacts]);
+  const contactPresence = useMemo(
+    () => ({ ...baseContactPresence, ...contactPresenceOverrides }),
+    [baseContactPresence, contactPresenceOverrides]
+  );
 
   const {
     data: fetchedMessages,
     isLoading: isLoadingMessages,
     error: messagesError,
-    refetch: refetchMessages,
   } = useGetMessagesQuery(effectiveSelectedConversationId, { skip: !effectiveSelectedConversationId });
   const displayedMessages = useMemo(() => {
     return buildDisplayedMessages(fetchedMessages || [], liveMessages, updatedMessages, deletedMessageIds);
@@ -284,17 +311,6 @@ export default function ChatWorkspace({
       toast.error(feedback, { toastId: `chat-workspace-${feedback}` });
     }
   }, [feedback]);
-
-  useEffect(() => {
-    const nextPresence = {};
-    contacts.forEach((contact) => {
-      nextPresence[contact.id] = {
-        is_online: Boolean(contact.is_online),
-        last_seen_at: contact.last_seen_at || null,
-      };
-    });
-    setContactPresence(nextPresence);
-  }, [contacts]);
 
   useEffect(() => {
     if (!effectiveSelectedConversationId || !isTokenUsable(token)) {
@@ -352,7 +368,7 @@ export default function ChatWorkspace({
             return;
           }
           if (payload?.event === "presence" && payload?.user_id) {
-            setContactPresence((prev) => ({
+            setContactPresenceOverrides((prev) => ({
               ...prev,
               [payload.user_id]: {
                 is_online: Boolean(payload.is_online),
@@ -510,7 +526,8 @@ export default function ChatWorkspace({
     if (!effectiveSelectedConversationId || !blob) {
       return;
     }
-    const localMessageId = `local-voice-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const now = getTimestampMs();
+    const localMessageId = createLocalVoiceMessageId();
     const localAudioUrl = URL.createObjectURL(blob);
     const localMessage = {
       id: localMessageId,
@@ -518,8 +535,8 @@ export default function ChatWorkspace({
       content: "",
       audio_url: localAudioUrl,
       duration_ms: durationMs,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      created_at: new Date(now).toISOString(),
+      updated_at: new Date(now).toISOString(),
       sender_id: currentUserId,
       sender_email: "",
       sender_role: "",
@@ -529,7 +546,7 @@ export default function ChatWorkspace({
       _local_pending: true,
     };
     setLiveMessages((prev) => [...prev, localMessage]);
-    const file = new File([blob], `voice-${Date.now()}.webm`, { type: blob.type || "audio/webm" });
+    const file = new File([blob], createVoiceFileName(), { type: blob.type || "audio/webm" });
     const formData = new FormData();
     formData.append("audio", file);
     formData.append("duration_ms", String(durationMs));
@@ -561,7 +578,7 @@ export default function ChatWorkspace({
   const stopRecording = ({ discard = false } = {}) => {
     shouldDiscardRecordingRef.current = discard;
     if (recordingStartedAtRef.current) {
-      stoppedDurationMsRef.current = Date.now() - recordingStartedAtRef.current;
+      stoppedDurationMsRef.current = getTimestampMs() - recordingStartedAtRef.current;
     }
     const recorder = mediaRecorderRef.current;
     if (recorder && recorder.state !== "inactive") {
@@ -608,19 +625,19 @@ export default function ChatWorkspace({
       setIsRecording(true);
       setRecordingDurationMs(0);
       stoppedDurationMsRef.current = 0;
-      recordingStartedAtRef.current = Date.now();
+      recordingStartedAtRef.current = getTimestampMs();
       emitRecording(true);
       isLocalRecordingRef.current = true;
       recordingTickerRef.current = window.setInterval(() => {
         if (!recordingStartedAtRef.current) {
           return;
         }
-        setRecordingDurationMs(Date.now() - recordingStartedAtRef.current);
+        setRecordingDurationMs(getTimestampMs() - recordingStartedAtRef.current);
       }, 200);
       recordingStopTimerRef.current = window.setTimeout(() => {
         stopRecording();
       }, 2 * 60 * 1000);
-    } catch (error) {
+    } catch {
       toast.error("Microphone access is required to record voice.");
     }
   };
@@ -757,8 +774,6 @@ export default function ChatWorkspace({
     }
 
     for (const messageId of selectedMessageIds) {
-      // Sequential delete keeps state predictable and uses existing endpoint contracts.
-      // eslint-disable-next-line no-await-in-loop
       await handleDelete(messageId, { skipConfirm: true });
     }
     setSelectedMessageIds([]);

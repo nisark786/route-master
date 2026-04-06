@@ -1,13 +1,20 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
-  validate:
+  frontend:
+    name: Frontend Lint And Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -20,11 +27,98 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/route_management/package-lock.json
 
-      - name: Frontend Build
+      - name: Install Dependencies
         working-directory: frontend/route_management
+        run: npm ci
+
+      - name: Lint
+        working-directory: frontend/route_management
+        run: npm run lint
+
+      - name: Build
+        working-directory: frontend/route_management
+        run: npm run build
+
+  backend:
+    name: Backend Pytest
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: route_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d route_db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DEBUG: "True"
+      SECRET_KEY: ci-secret-key
+      DB_ENGINE: django.contrib.gis.db.backends.postgis
+      DB_HOST: 127.0.0.1
+      DB_PORT: "5432"
+      DB_NAME: route_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_SSLMODE: disable
+      DB_ADMIN_DB: postgres
+      USE_REDIS_CACHE: "False"
+      SEND_OTP_ASYNC: "False"
+      EMAIL_BACKEND: django.core.mail.backends.locmem.EmailBackend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: core_services/requirements.txt
+
+      - name: Install System Dependencies
         run: |
-          npm ci
-          npm run build
+          sudo apt-get update
+          sudo apt-get install -y gdal-bin libgdal-dev libproj-dev binutils
+
+      - name: Install Python Dependencies
+        run: pip install -r core_services/requirements.txt
+
+      - name: Run Pytest
+        working-directory: core_services
+        run: pytest -q
+
+  ai-service:
+    name: AI Service Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ai_service/requirements.txt
+
+      - name: Install Dependencies
+        run: pip install -r ai_service/requirements.txt
+
+      - name: Syntax Check
+        run: python -m compileall ai_service
+
+  infra:
+    name: Helm And Infra Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -32,10 +126,7 @@ jobs:
           python-version: "3.12"
 
       - name: Python Syntax Check
-        run: |
-          python -m compileall core_services
-          python -m compileall ai_service
-          python -m compileall infra
+        run: python -m compileall infra
 
       - name: Setup Helm
         uses: azure/setup-helm@v4
@@ -43,11 +134,45 @@ jobs:
           version: v3.15.4
 
       - name: Helm Lint
-        run: |
-          helm lint infra/k8s/helm/route-management
+        run: helm lint infra/k8s/helm/route-management
 
-      - name: Helm Template Smoke (Staging)
+      - name: Helm Template Smoke
         run: |
           helm template route-management infra/k8s/helm/route-management \
             -f infra/k8s/helm/route-management/values.yaml \
             -f infra/k8s/values/staging.yaml > /tmp/staging-rendered.yaml
+          helm template route-management infra/k8s/helm/route-management \
+            -f infra/k8s/helm/route-management/values.yaml \
+            -f infra/k8s/values/production.yaml \
+            -f infra/k8s/values/production.private.example.yaml > /tmp/production-rendered.yaml
+
+  docker-builds:
+    name: Docker Build Validation
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            dockerfile: core_services/Dockerfile.prod
+            context: core_services
+          - name: ai-service
+            dockerfile: ai_service/Dockerfile.prod
+            context: ai_service
+          - name: frontend
+            dockerfile: frontend/route_management/Dockerfile.prod
+            context: frontend/route_management
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build ${{ matrix.name }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: false
+          load: false

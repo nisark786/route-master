@@ -52,6 +52,14 @@ jobs:
       - name: Pre-deploy auth/addon/secret checks
         shell: pwsh
         run: |
+          if ([string]::IsNullOrWhiteSpace("${{ github.event.inputs.image_tag }}")) {
+            throw "image_tag is required."
+          }
+
+          if ("${{ github.event.inputs.image_tag }}" -in @("latest", "staging-latest")) {
+            throw "Production deploy requires an immutable image tag, not '${{ github.event.inputs.image_tag }}'."
+          }
+
           if ([string]::IsNullOrWhiteSpace("${{ secrets.PROD_PRIVATE_VALUES_YAML }}")) {
             throw "PROD_PRIVATE_VALUES_YAML secret is empty."
           }

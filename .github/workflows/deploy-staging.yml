@@ -1,13 +1,6 @@
 name: Deploy Staging
 
 on:
-  workflow_dispatch:
-    inputs:
-      skip_build:
-        description: "Skip image build/push and deploy using staging-latest tags"
-        required: false
-        type: boolean
-        default: false
   push:
     branches: [main]
     paths:
@@ -16,6 +9,12 @@ on:
       - "frontend/route_management/**"
       - "infra/k8s/**"
       - ".github/workflows/deploy-staging.yml"
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Existing immutable image tag to deploy to staging. Leave empty to build from current commit."
+        required: false
+        type: string
 
 concurrency:
   group: deploy-staging
@@ -37,30 +36,27 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.out.outputs.image_tag }}
+      should_build: ${{ steps.out.outputs.should_build }}
     steps:
-      - name: Resolve deploy image tag
+      - name: Resolve Image Tag
         id: out
+        shell: bash
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.skip_build }}" == "true" ]]; then
-            echo "image_tag=staging-latest" >> "$GITHUB_OUTPUT"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.image_tag }}" ]]; then
+            echo "image_tag=${{ github.event.inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
           else
             echo "image_tag=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
           fi
 
   build-images:
-    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_build) }}
+    if: ${{ needs.resolve-image-tag.outputs.should_build == 'true' }}
     runs-on: ubuntu-latest
     needs: resolve-image-tag
-    outputs:
-      image_tag: ${{ steps.vars.outputs.image_tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Set Vars
-        id: vars
-        run: |
-          echo "image_tag=${{ needs.resolve-image-tag.outputs.image_tag }}" >> "$GITHUB_OUTPUT"
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -69,38 +65,37 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build + Push Backend
-        run: |
-          docker build -f core_services/Dockerfile.prod \
-            -t $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-backend:${{ needs.resolve-image-tag.outputs.image_tag }} \
-            -t $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-backend:staging-latest \
-            core_services
-          docker push $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-backend:${{ needs.resolve-image-tag.outputs.image_tag }}
-          docker push $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-backend:staging-latest
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Build + Push AI Service
-        run: |
-          docker build -f ai_service/Dockerfile.prod \
-            -t $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-ai-service:${{ needs.resolve-image-tag.outputs.image_tag }} \
-            -t $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-ai-service:staging-latest \
-            ai_service
-          docker push $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-ai-service:${{ needs.resolve-image-tag.outputs.image_tag }}
-          docker push $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-ai-service:staging-latest
+      - name: Build And Push Backend
+        uses: docker/build-push-action@v6
+        with:
+          context: core_services
+          file: core_services/Dockerfile.prod
+          push: true
+          tags: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_PREFIX }}/route-management-backend:${{ needs.resolve-image-tag.outputs.image_tag }}
 
-      - name: Build + Push Frontend
-        run: |
-          docker build -f frontend/route_management/Dockerfile.prod \
-            -t $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-frontend:${{ needs.resolve-image-tag.outputs.image_tag }} \
-            -t $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-frontend:staging-latest \
-            frontend/route_management
-          docker push $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-frontend:${{ needs.resolve-image-tag.outputs.image_tag }}
-          docker push $IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-frontend:staging-latest
+      - name: Build And Push AI Service
+        uses: docker/build-push-action@v6
+        with:
+          context: ai_service
+          file: ai_service/Dockerfile.prod
+          push: true
+          tags: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_PREFIX }}/route-management-ai-service:${{ needs.resolve-image-tag.outputs.image_tag }}
+
+      - name: Build And Push Frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend/route_management
+          file: frontend/route_management/Dockerfile.prod
+          push: true
+          tags: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_PREFIX }}/route-management-frontend:${{ needs.resolve-image-tag.outputs.image_tag }}
 
   deploy:
-    # Local Docker Desktop Kubernetes is only reachable from a self-hosted runner
-    # running on the same machine/network.
     runs-on: self-hosted
     needs: [resolve-image-tag, build-images]
+    if: ${{ always() && needs.resolve-image-tag.result == 'success' && (needs.build-images.result == 'success' || needs.build-images.result == 'skipped') }}
     environment: staging
     steps:
       - name: Checkout
@@ -125,7 +120,7 @@ jobs:
           }
           aws --version
 
-      - name: Use local kubeconfig (self-hosted)
+      - name: Use Local kubeconfig
         shell: powershell
         run: |
           $kubeConfigPath = Join-Path $env:USERPROFILE ".kube\config"
@@ -133,10 +128,9 @@ jobs:
             throw "Local kubeconfig not found at $kubeConfigPath"
           }
           $env:KUBECONFIG = $kubeConfigPath
-          Write-Host "Using local kubeconfig at $kubeConfigPath"
           kubectl cluster-info
 
-      - name: Pre-deploy auth/addon/secret checks
+      - name: Pre-deploy Checks
         shell: powershell
         run: |
           if ([string]::IsNullOrWhiteSpace($env:STAGING_PRIVATE_VALUES_RAW)) {
@@ -150,70 +144,23 @@ jobs:
           aws sts get-caller-identity | Out-Null
           kubectl auth can-i get pods -n $env:NAMESPACE | Out-Null
 
-          $currentContext = kubectl config current-context
-          if ($currentContext -like "arn:aws:eks:*") {
-            $parts = $currentContext.Split(":")
-            $region = $parts[3]
-            $clusterName = $parts[$parts.Length - 1].Split("/")[1]
-            Write-Host "Detected EKS context for cluster '$clusterName' in region '$region'"
-            $addons = aws eks list-addons --cluster-name $clusterName --region $region | ConvertFrom-Json
-            if (-not ($addons.addons -contains "aws-ebs-csi-driver")) {
-              throw "EKS addon aws-ebs-csi-driver is missing. Install it before deploy."
-            }
-          }
-
-      - name: Write staging private values
+      - name: Write Staging Private Values
         shell: powershell
         run: |
           $privatePath = "C:\actions-runner\_work\_temp\staging.private.yaml"
           @"
           ${{ secrets.STAGING_PRIVATE_VALUES_YAML }}
           "@ | Out-File -FilePath $privatePath -Encoding utf8
-          Write-Host "Private values written to $privatePath"
 
-      - name: Ensure staging namespace exists
+      - name: Ensure Staging Namespace Exists
         shell: powershell
         run: |
           $existing = kubectl get namespace $env:NAMESPACE --ignore-not-found -o name
           if ([string]::IsNullOrWhiteSpace($existing)) {
-            Write-Host "Namespace $env:NAMESPACE not found. Creating..."
             kubectl create namespace $env:NAMESPACE
-          } else {
-            Write-Host "Namespace $env:NAMESPACE already exists"
           }
 
-      - name: Clean stale migration hook job
-        shell: powershell
-        run: |
-          $jobName = "$env:RELEASE_NAME-backend-migrate"
-          kubectl delete job $jobName -n $env:NAMESPACE --ignore-not-found=true
-
-      - name: Pre-pull release images on self-hosted runner
-        shell: powershell
-        run: |
-          $images = @(
-            "$env:IMAGE_REGISTRY/$env:IMAGE_PREFIX/route-management-backend:${{ needs.resolve-image-tag.outputs.image_tag }}",
-            "$env:IMAGE_REGISTRY/$env:IMAGE_PREFIX/route-management-ai-service:${{ needs.resolve-image-tag.outputs.image_tag }}",
-            "$env:IMAGE_REGISTRY/$env:IMAGE_PREFIX/route-management-frontend:${{ needs.resolve-image-tag.outputs.image_tag }}"
-          )
-
-          foreach ($image in $images) {
-            $ok = $false
-            for ($i = 1; $i -le 3; $i++) {
-              Write-Host "Pulling $image (attempt $i/3)"
-              docker pull $image
-              if ($LASTEXITCODE -eq 0) {
-                $ok = $true
-                break
-              }
-              Start-Sleep -Seconds (5 * $i)
-            }
-            if (-not $ok) {
-              throw "Failed to pre-pull image: $image"
-            }
-          }
-
-      - name: Recover pending Helm release lock
+      - name: Recover Pending Helm Release Lock
         shell: powershell
         run: |
           $statusJson = $null
@@ -221,20 +168,16 @@ jobs:
             $statusJson = helm status $env:RELEASE_NAME -n $env:NAMESPACE -o json 2>$null
           }
           catch {
-            Write-Host "Release not found yet; continuing."
             exit 0
           }
+
           if (-not $statusJson) {
-            Write-Host "No existing release status found; continuing."
             exit 0
           }
 
           $statusObj = $statusJson | ConvertFrom-Json
           $currentStatus = [string]$statusObj.info.status
-          Write-Host "Current Helm release status: $currentStatus"
-
           if (-not $currentStatus.StartsWith("pending-")) {
-            Write-Host "Release is not pending; continuing."
             exit 0
           }
 
@@ -243,15 +186,13 @@ jobs:
           $lastDeployed = $history | Where-Object { $_.status -eq "deployed" } | Select-Object -Last 1
 
           if ($null -ne $lastDeployed) {
-            Write-Host "Pending lock detected. Rolling back to revision $($lastDeployed.revision)"
             helm rollback $env:RELEASE_NAME $lastDeployed.revision -n $env:NAMESPACE --wait --timeout 10m
           }
           else {
-            Write-Host "Pending lock detected with no deployed revision. Uninstalling release to recover."
             helm uninstall $env:RELEASE_NAME -n $env:NAMESPACE
           }
 
-      - name: Deploy with Helm
+      - name: Deploy With Helm
         shell: powershell
         run: |
           $privatePath = "C:\actions-runner\_work\_temp\staging.private.yaml"
@@ -268,7 +209,7 @@ jobs:
             --set images.frontend.tag=${{ needs.resolve-image-tag.outputs.image_tag }} `
             --wait --timeout 30m
 
-      - name: Post-deploy smoke check
+      - name: Post-deploy Smoke Check
         shell: powershell
         run: |
           $serviceName = "$env:RELEASE_NAME-gateway"
@@ -288,14 +229,10 @@ jobs:
               try {
                 $resp = Invoke-WebRequest -Uri ("http://127.0.0.1:18080" + $Path) -Method Get -TimeoutSec 5
                 if ($resp.StatusCode -eq 200) {
-                  Write-Host "$Path => 200"
                   return
                 }
-                Write-Host "$Path => $($resp.StatusCode) (attempt $i/$MaxAttempts)"
               }
-              catch {
-                Write-Host "$Path => not ready (attempt $i/$MaxAttempts)"
-              }
+              catch {}
               Start-Sleep -Seconds 2
             }
 

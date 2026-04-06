@@ -116,7 +116,7 @@ export default function CompanyShopsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [displayShops, setDisplayShops] = useState([]);
 
-  const shops = data?.results || [];
+  const shops = useMemo(() => data?.results || [], [data?.results]);
   const totalPages = data?.total_pages || 1;
 
   useEffect(() => {
