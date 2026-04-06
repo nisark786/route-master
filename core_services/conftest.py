@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 
 import pytest
 import psycopg2
@@ -10,7 +11,7 @@ from rest_framework.test import APIClient
 from apps.authentication.models import User
 from apps.company.models import Company
 from apps.authentication.services import generate_tokens_for_user
-from apps.billing.models import SubscriptionPlan
+from apps.billing.models import CompanySubscription, SubscriptionPlan
 from apps.company_admin.models import Driver, DriverAssignment, Product, Route, RouteShop, Shop, Vehicle
 
 
@@ -83,59 +84,11 @@ def company(db):
 
 
 @pytest.fixture
-def company_admin_user(db, company):
-    return User.objects.create_user(
-        email="admin@example.com",
-        password="StrongPass123",
-        role="COMPANY_ADMIN",
-        company=company,
-        mobile_number="9876543210",
-        must_change_password=False,
-    )
-
-
-@pytest.fixture
 def super_admin_user(db):
     return User.objects.create_superuser(
         email="superadmin@example.com",
         password="StrongPass123",
         role="SUPER_ADMIN",
-    )
-
-
-@pytest.fixture
-def driver_user(db, company):
-    return User.objects.create_user(
-        email="driver@example.com",
-        password="StrongPass123",
-        role="DRIVER",
-        company=company,
-        mobile_number="9000000001",
-        must_change_password=False,
-    )
-
-
-@pytest.fixture
-def shop_owner_user(db, company):
-    return User.objects.create_user(
-        email="shopowner@example.com",
-        password="StrongPass123",
-        role="SHOP_OWNER",
-        company=company,
-        mobile_number="9000000002",
-        must_change_password=False,
-    )
-
-
-@pytest.fixture
-def first_login_user(db, company):
-    return User.objects.create_user(
-        email="firstlogin@example.com",
-        password="TempPass123",
-        role="COMPANY_ADMIN",
-        company=company,
-        mobile_number="9123456789",
-        must_change_password=True,
     )
 
 
@@ -148,6 +101,69 @@ def subscription_plan(db):
         duration_days=30,
         features=["core"],
         is_active=True,
+    )
+
+
+@pytest.fixture
+def active_company_subscription(db, company, subscription_plan):
+    subscription, _ = CompanySubscription.objects.get_or_create(
+        company=company,
+        defaults={
+            "plan": subscription_plan,
+            "end_date": timezone.now() + timedelta(days=30),
+            "amount_paid": subscription_plan.price,
+            "currency": "INR",
+            "is_active": True,
+        },
+    )
+    return subscription
+
+
+@pytest.fixture
+def company_admin_user(db, company, active_company_subscription):
+    return User.objects.create_user(
+        email="admin@example.com",
+        password="StrongPass123",
+        role="COMPANY_ADMIN",
+        company=company,
+        mobile_number="9876543210",
+        must_change_password=False,
+    )
+
+
+@pytest.fixture
+def driver_user(db, company, active_company_subscription):
+    return User.objects.create_user(
+        email="driver@example.com",
+        password="StrongPass123",
+        role="DRIVER",
+        company=company,
+        mobile_number="9000000001",
+        must_change_password=False,
+    )
+
+
+@pytest.fixture
+def shop_owner_user(db, company, active_company_subscription):
+    return User.objects.create_user(
+        email="shopowner@example.com",
+        password="StrongPass123",
+        role="SHOP_OWNER",
+        company=company,
+        mobile_number="9000000002",
+        must_change_password=False,
+    )
+
+
+@pytest.fixture
+def first_login_user(db, company, active_company_subscription):
+    return User.objects.create_user(
+        email="firstlogin@example.com",
+        password="TempPass123",
+        role="COMPANY_ADMIN",
+        company=company,
+        mobile_number="9123456789",
+        must_change_password=True,
     )
 
 
