@@ -166,6 +166,8 @@ def sync_company_knowledge(company_id: str) -> dict[str, Any]:
 def queue_company_ai_sync(company_id: str, reason: str = "model_change") -> bool:
     if not company_id:
         return False
+    if not settings.AI_AUTOSYNC_ENABLED:
+        return False
     cache_key = f"ai_sync:queued:{company_id}"
     queued = cache.add(cache_key, reason, timeout=max(15, settings.AI_SYNC_QUEUE_LOCK_SECONDS))
     return bool(queued)

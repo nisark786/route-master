@@ -78,6 +78,10 @@ jobs:
       DB_ADMIN_DB: postgres
       USE_REDIS_CACHE: "False"
       SEND_OTP_ASYNC: "False"
+      AI_AUTOSYNC_ENABLED: "False"
+      CELERY_TASK_ALWAYS_EAGER: "True"
+      CELERY_BROKER_URL: memory://
+      CELERY_RESULT_BACKEND: cache+memory://
       EMAIL_BACKEND: django.core.mail.backends.locmem.EmailBackend
     steps:
       - name: Checkout
