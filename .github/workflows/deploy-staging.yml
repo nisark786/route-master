@@ -1,14 +1,6 @@
 name: Deploy Staging
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "core_services/**"
-      - "ai_service/**"
-      - "frontend/route_management/**"
-      - "infra/k8s/**"
-      - ".github/workflows/deploy-staging.yml"
   workflow_dispatch:
     inputs:
       image_tag:

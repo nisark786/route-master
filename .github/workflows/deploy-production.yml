@@ -1,11 +1,15 @@
 name: Deploy Production
 
 on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       image_tag:
-        description: "Image tag to deploy (usually a Git SHA from staging)"
-        required: true
+        description: "Existing immutable image tag to deploy. Leave empty to build and deploy the current commit SHA."
+        required: false
         type: string
       namespace:
         description: "Kubernetes namespace"
@@ -19,19 +23,91 @@ concurrency:
 
 permissions:
   contents: read
+  packages: write
 
 env:
   IMAGE_REGISTRY: ghcr.io
   IMAGE_PREFIX: ${{ github.repository_owner }}
   RELEASE_NAME: route-management
+  DEPLOY_NAMESPACE: ${{ github.event.inputs.namespace || 'route-prod' }}
 
 jobs:
-  deploy:
+  resolve-image-tag:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.out.outputs.image_tag }}
+      should_build: ${{ steps.out.outputs.should_build }}
+    steps:
+      - name: Resolve Image Tag
+        id: out
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.image_tag }}" ]]; then
+            echo "image_tag=${{ github.event.inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            echo "image_tag=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "image_tag=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-images:
+    if: ${{ needs.resolve-image-tag.outputs.should_build == 'true' }}
+    runs-on: ubuntu-latest
+    needs: resolve-image-tag
+    steps:
+      - name: Checkout triggering SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build And Push Backend
+        uses: docker/build-push-action@v6
+        with:
+          context: core_services
+          file: core_services/Dockerfile.prod
+          push: true
+          tags: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_PREFIX }}/route-management-backend:${{ needs.resolve-image-tag.outputs.image_tag }}
+
+      - name: Build And Push AI Service
+        uses: docker/build-push-action@v6
+        with:
+          context: ai_service
+          file: ai_service/Dockerfile.prod
+          push: true
+          tags: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_PREFIX }}/route-management-ai-service:${{ needs.resolve-image-tag.outputs.image_tag }}
+
+      - name: Build And Push Frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend/route_management
+          file: frontend/route_management/Dockerfile.prod
+          push: true
+          tags: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_PREFIX }}/route-management-frontend:${{ needs.resolve-image-tag.outputs.image_tag }}
+
+  deploy:
+    if: ${{ always() && needs.resolve-image-tag.result == 'success' && (needs.build-images.result == 'success' || needs.build-images.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    needs: [resolve-image-tag, build-images]
     environment: production
     steps:
-      - name: Checkout
+      - name: Checkout triggering SHA
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Setup kubectl
         uses: azure/setup-kubectl@v4
@@ -52,12 +128,12 @@ jobs:
       - name: Pre-deploy auth/addon/secret checks
         shell: pwsh
         run: |
-          if ([string]::IsNullOrWhiteSpace("${{ github.event.inputs.image_tag }}")) {
+          if ([string]::IsNullOrWhiteSpace("${{ needs.resolve-image-tag.outputs.image_tag }}")) {
             throw "image_tag is required."
           }
 
-          if ("${{ github.event.inputs.image_tag }}" -in @("latest", "staging-latest")) {
-            throw "Production deploy requires an immutable image tag, not '${{ github.event.inputs.image_tag }}'."
+          if ("${{ needs.resolve-image-tag.outputs.image_tag }}" -in @("latest", "staging-latest")) {
+            throw "Production deploy requires an immutable image tag, not '${{ needs.resolve-image-tag.outputs.image_tag }}'."
           }
 
           if ([string]::IsNullOrWhiteSpace("${{ secrets.PROD_PRIVATE_VALUES_YAML }}")) {
@@ -68,7 +144,7 @@ jobs:
             throw "PROD_PRIVATE_VALUES_YAML still contains __REQUIRED__ placeholders."
           }
 
-          kubectl auth can-i get pods -n "${{ github.event.inputs.namespace }}" | Out-Null
+          kubectl auth can-i get pods -n "$env:DEPLOY_NAMESPACE" | Out-Null
 
           $currentContext = kubectl config current-context
           if (($currentContext -like "arn:aws:eks:*") -and (Get-Command aws -ErrorAction SilentlyContinue)) {
@@ -106,22 +182,22 @@ jobs:
       - name: Deploy with Helm
         run: |
           helm upgrade --install $RELEASE_NAME infra/k8s/helm/route-management \
-            -n ${{ github.event.inputs.namespace }} \
+            -n $DEPLOY_NAMESPACE \
             --create-namespace \
             -f infra/k8s/helm/route-management/values.yaml \
             -f infra/k8s/values/production.yaml \
             -f /tmp/production.private.yaml \
             --set images.backend.repository=$IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-backend \
-            --set images.backend.tag=${{ github.event.inputs.image_tag }} \
+            --set images.backend.tag=${{ needs.resolve-image-tag.outputs.image_tag }} \
             --set images.aiService.repository=$IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-ai-service \
-            --set images.aiService.tag=${{ github.event.inputs.image_tag }} \
+            --set images.aiService.tag=${{ needs.resolve-image-tag.outputs.image_tag }} \
             --set images.frontend.repository=$IMAGE_REGISTRY/$IMAGE_PREFIX/route-management-frontend \
-            --set images.frontend.tag=${{ github.event.inputs.image_tag }} \
+            --set images.frontend.tag=${{ needs.resolve-image-tag.outputs.image_tag }} \
             --wait --timeout 20m
 
       - name: Post-deploy smoke check
         run: |
-          kubectl run smoke-prod-check -n ${{ github.event.inputs.namespace }} --rm -i --restart=Never \
+          kubectl run smoke-prod-check -n $DEPLOY_NAMESPACE --rm -i --restart=Never \
             --image=curlimages/curl --command -- sh -lc "
               set -e
               curl -sS -o /dev/null -w 'gateway=%{http_code}\n' http://$RELEASE_NAME-gateway/healthz
