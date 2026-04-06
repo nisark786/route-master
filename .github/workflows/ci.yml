@@ -93,7 +93,7 @@ jobs:
 
       - name: Run Pytest
         working-directory: core_services
-        run: pytest -q
+        run: pytest -vv -x
 
   ai-service:
     name: AI Service Validation
