@@ -90,5 +90,5 @@ def test_get_accessible_contacts_for_user_returns_expected_contacts(
     driver_contacts = list(get_accessible_contacts_for_user(company_admin_user))
     admin_contacts = list(get_accessible_contacts_for_user(company_admin_user, scope="administration"))
 
-    assert driver_user in driver_contacts
-    assert super_admin_user in admin_contacts
+    assert any(contact["id"] == driver_user.id for contact in driver_contacts)
+    assert any(contact["id"] == super_admin_user.id for contact in admin_contacts)
