@@ -1,7 +1,7 @@
 import pytest
 from django.core.cache import cache
 
-from apps.billing.models import SubscriptionPlan
+from apps.billing.models import PendingCompanyRegistration, SubscriptionPlan
 from apps.billing.services import (
     delete_registration_otp,
     generate_otp,
@@ -33,19 +33,27 @@ def test_hash_and_verify_otp_round_trip():
 
 
 @pytest.mark.django_db
-def test_registration_otp_cache_lifecycle():
-    registration_id = "abc-123"
+def test_registration_otp_cache_lifecycle(subscription_plan):
+    registration = PendingCompanyRegistration.objects.create(
+        company_name="Test Company",
+        official_email="company@example.com",
+        phone="9999999999",
+        address="Test Address",
+        admin_email="admin@example.com",
+        admin_password_hash="hashed-password",
+        plan=subscription_plan,
+    )
     otp = "654321"
 
-    store_registration_otp(registration_id, otp)
-    hashed = get_registration_otp_hash(registration_id)
+    store_registration_otp(registration.id, otp)
+    hashed = get_registration_otp_hash(registration.id)
 
     assert hashed
     assert verify_hashed_otp(otp, hashed) is True
 
-    delete_registration_otp(registration_id)
+    delete_registration_otp(registration.id)
 
-    assert get_registration_otp_hash(registration_id) is None
+    assert get_registration_otp_hash(registration.id) is None
 
 
 @pytest.mark.django_db
