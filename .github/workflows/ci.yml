@@ -286,9 +286,7 @@ jobs:
         env:
           PROD_PRIVATE_VALUES_YAML: ${{ secrets.PROD_PRIVATE_VALUES_YAML }}
         run: |
-          cat > /tmp/production.private.yaml <<'EOF'
-          $PROD_PRIVATE_VALUES_YAML
-          EOF
+          printf '%s\n' "$PROD_PRIVATE_VALUES_YAML" > /tmp/production.private.yaml
 
       - name: Production readiness check
         shell: pwsh
