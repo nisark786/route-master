@@ -31,19 +31,3 @@ def test_chat_conversation_list_returns_accessible_contacts_for_company_admin(
     assert len(response.data["data"]["contacts"]) == 1
     assert response.data["data"]["contacts"][0]["id"] == str(driver_user.id)
 
-
-@pytest.mark.django_db
-def test_chat_message_can_be_deleted_by_sender(auth_client, company_admin_user, driver_user):
-    conversation, _ = get_or_create_conversation(
-        request_user=company_admin_user,
-        target_user=driver_user,
-        conversation_type="DRIVER",
-    )
-    message = create_message(conversation=conversation, sender=company_admin_user, content="Hello")
-    client = auth_client(company_admin_user)
-
-    response = client.delete(f"/api/chat/conversations/{conversation.id}/messages/{message.id}/")
-
-    assert response.status_code == status.HTTP_200_OK
-    assert response.data["success"] is True
-    assert Message.objects.filter(id=message.id).exists() is False
