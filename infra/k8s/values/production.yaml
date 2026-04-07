@@ -9,7 +9,7 @@ ingress:
   annotations:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
   hosts:
-    - host: "__PRODUCTION_HOST__"
+    - host: "app.tracestack.online"
       paths:
         - path: /api
           pathType: Prefix
@@ -26,18 +26,18 @@ ingress:
   tls:
     - secretName: route-prod-tls
       hosts:
-        - "__PRODUCTION_HOST__"
+        - "app.tracestack.online"
 
 config:
   core:
     DEBUG: "False"
-    ALLOWED_HOSTS: "__PRODUCTION_HOST__,backend,route-management-backend"
-    CORS_ALLOWED_ORIGINS: "https://__PRODUCTION_HOST__,https://route-master-sales.vercel.app"
+    ALLOWED_HOSTS: "app.tracestack.online,backend,route-management-backend"
+    CORS_ALLOWED_ORIGINS: "https://app.tracestack.online"
     USE_S3_MEDIA: "True"
     AWS_S3_MEDIA_PREFIX: "media"
     AWS_QUERYSTRING_AUTH: "False"
   ai:
-    CORS_ALLOWED_ORIGINS: "https://__PRODUCTION_HOST__,https://route-master-sales.vercel.app"
+    CORS_ALLOWED_ORIGINS: "https://app.tracestack.online"
     EMBEDDING_PROVIDER: "huggingface"
     QDRANT_COLLECTION: "route_docs_prod"
 
