@@ -119,6 +119,8 @@ jobs:
 
       - name: Pre-deploy auth/addon/secret checks
         shell: pwsh
+        env:
+          PROD_PRIVATE_VALUES_YAML: ${{ secrets.PROD_PRIVATE_VALUES_YAML }}
         run: |
           if ([string]::IsNullOrWhiteSpace("${{ needs.resolve-image-tag.outputs.image_tag }}")) {
             throw "image_tag is required."
@@ -128,11 +130,11 @@ jobs:
             throw "Production deploy requires an immutable image tag, not '${{ needs.resolve-image-tag.outputs.image_tag }}'."
           }
 
-          if ([string]::IsNullOrWhiteSpace("${{ secrets.PROD_PRIVATE_VALUES_YAML }}")) {
+          if ([string]::IsNullOrWhiteSpace($env:PROD_PRIVATE_VALUES_YAML)) {
             throw "PROD_PRIVATE_VALUES_YAML secret is empty."
           }
 
-          if ("${{ secrets.PROD_PRIVATE_VALUES_YAML }}".Contains("__REQUIRED__")) {
+          if ($env:PROD_PRIVATE_VALUES_YAML.Contains("__REQUIRED__")) {
             throw "PROD_PRIVATE_VALUES_YAML still contains __REQUIRED__ placeholders."
           }
 
@@ -156,9 +158,11 @@ jobs:
           }
 
       - name: Write production private values
+        env:
+          PROD_PRIVATE_VALUES_YAML: ${{ secrets.PROD_PRIVATE_VALUES_YAML }}
         run: |
           cat > /tmp/production.private.yaml <<'EOF'
-          ${{ secrets.PROD_PRIVATE_VALUES_YAML }}
+          $PROD_PRIVATE_VALUES_YAML
           EOF
 
       - name: Production readiness check
